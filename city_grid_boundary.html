@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FoE City Grid Boundary</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a2230; color: #d0c8b0; font-family: 'Segoe UI', sans-serif; padding: 20px; }
+  h1 { font-size: 1.2rem; margin-bottom: 4px; color: #e8d8a0; letter-spacing: 1px; }
+  .subtitle { font-size: 0.78rem; color: #7a8a9a; margin-bottom: 16px; }
+  #container { position: relative; display: inline-block; }
+  canvas { display: block; cursor: crosshair; }
+  #tooltip {
+    position: fixed; pointer-events: none; background: rgba(10,18,28,0.92);
+    border: 1px solid #4a6a8a; border-radius: 4px; padding: 5px 10px;
+    font-size: 0.75rem; color: #c8d8e8; display: none; z-index: 10;
+  }
+  .legend {
+    display: flex; gap: 20px; margin-top: 12px; font-size: 0.78rem; align-items: center;
+  }
+  .swatch { width: 16px; height: 16px; display: inline-block; vertical-align: middle;
+             border: 1px solid rgba(255,255,255,0.15); margin-right: 5px; }
+  .stats { margin-top: 10px; font-size: 0.75rem; color: #8a9aaa; }
+  #tooltip strong { color: #ffd770; display: block; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<h1>Forge of Empires â€” City Grid Boundary</h1>
+<p class="subtitle">Snapshot: city_MapPMTHS_20260426 &nbsp;|&nbsp; Hover any cell for coordinates &nbsp;|&nbsp; Hover a Great Building for details</p>
+<div id="tooltip"></div>
+<div id="container">
+  <canvas id="grid"></canvas>
+</div>
+<div class="legend">
+  <span><span class="swatch" style="background:#b89a5e;"></span>Unlocked</span>
+  <span><span class="swatch" style="background:#1e3248;"></span>Locked</span>
+  <span><span class="swatch" style="background:#4a5560;"></span>Road (1Ã—1)</span>
+  <span><span class="swatch" style="background:#5a6a40;"></span>Road (2Ã—2)</span>
+  <span><span class="swatch" style="background:#ffc830;"></span>Town Hall</span>
+  <span><span class="swatch" style="background:#28a882;"></span>Generic</span>
+  <span><span class="swatch" style="background:#a8c820;"></span>Tower/Flame</span>
+  <span><span class="swatch" style="background:#e08820;"></span>Production</span>
+  <span><span class="swatch" style="background:#e03838;"></span>Military</span>
+  <span><span class="swatch" style="background:#40b840;"></span>Residential</span>
+  <span><span class="swatch" style="background:#d040a8;"></span>Decoration</span>
+  <span><span class="swatch" style="background:#9040d0;"></span>Hub (main)</span>
+  <span><span class="swatch" style="background:#b060e8;"></span>Hub (part)</span>
+  <span><span class="swatch" style="background:#28a8d8;"></span>Outpost/Ship</span>
+  <span><span class="swatch" style="background:#e04820;"></span>Friends Tavern</span>
+  <span><span class="swatch" style="background:#708888;"></span>Off-grid</span>
+  <span><span class="swatch" style="background:#2e5fa3;border:2px solid #70b8ff;"></span>Great Building</span>
+  <span><span class="swatch" style="background:rgba(255,255,255,0.06);border:1px solid #3a5a7a;"></span>Chunk border</span>
+  <span style="display:inline-flex;align-items:center;gap:3px"><svg width="14" height="10" style="flex-shrink:0"><circle cx="11" cy="5" r="3" fill="#ff8800"/></svg>Road required</span>
+</div>
+<div class="stats" id="stats"></div>
+
+<script>
+const ROADS = [{"x":14,"y":13,"w":2,"l":2},{"x":14,"y":15,"w":2,"l":2},{"x":14,"y":17,"w":2,"l":2},{"x":15,"y":41,"w":1,"l":1},{"x":15,"y":44,"w":1,"l":1},{"x":15,"y":42,"w":1,"l":1},{"x":15,"y":43,"w":1,"l":1},{"x":16,"y":44,"w":1,"l":1},{"x":17,"y":44,"w":1,"l":1},{"x":18,"y":44,"w":1,"l":1},{"x":19,"y":44,"w":1,"l":1},{"x":20,"y":44,"w":1,"l":1},{"x":21,"y":44,"w":1,"l":1},{"x":22,"y":44,"w":1,"l":1},{"x":23,"y":44,"w":1,"l":1},{"x":24,"y":44,"w":1,"l":1},{"x":25,"y":44,"w":1,"l":1},{"x":16,"y":37,"w":1,"l":1},{"x":43,"y":37,"w":1,"l":1},{"x":17,"y":37,"w":1,"l":1},{"x":26,"y":37,"w":1,"l":1},{"x":18,"y":37,"w":1,"l":1},{"x":19,"y":37,"w":1,"l":1},{"x":20,"y":37,"w":1,"l":1},{"x":21,"y":37,"w":1,"l":1},{"x":23,"y":37,"w":1,"l":1},{"x":22,"y":37,"w":1,"l":1},{"x":24,"y":37,"w":1,"l":1},{"x":25,"y":37,"w":1,"l":1},{"x":27,"y":37,"w":1,"l":1},{"x":31,"y":37,"w":1,"l":1},{"x":28,"y":37,"w":1,"l":1},{"x":29,"y":37,"w":1,"l":1},{"x":30,"y":37,"w":1,"l":1},{"x":32,"y":37,"w":1,"l":1},{"x":33,"y":37,"w":1,"l":1},{"x":34,"y":37,"w":1,"l":1},{"x":35,"y":37,"w":1,"l":1},{"x":36,"y":37,"w":1,"l":1},{"x":37,"y":37,"w":1,"l":1},{"x":38,"y":37,"w":1,"l":1},{"x":39,"y":37,"w":1,"l":1},{"x":40,"y":37,"w":1,"l":1},{"x":42,"y":37,"w":1,"l":1},{"x":41,"y":37,"w":1,"l":1},{"x":52,"y":43,"w":1,"l":1},{"x":44,"y":43,"w":1,"l":1},{"x":45,"y":43,"w":1,"l":1},{"x":46,"y":43,"w":1,"l":1},{"x":47,"y":43,"w":1,"l":1},{"x":48,"y":43,"w":1,"l":1},{"x":49,"y":43,"w":1,"l":1},{"x":51,"y":43,"w":1,"l":1},{"x":50,"y":43,"w":1,"l":1},{"x":44,"y":42,"w":1,"l":1},{"x":44,"y":41,"w":1,"l":1},{"x":44,"y":40,"w":1,"l":1},{"x":44,"y":39,"w":1,"l":1},{"x":44,"y":38,"w":1,"l":1},{"x":44,"y":37,"w":1,"l":1},{"x":44,"y":36,"w":1,"l":1},{"x":44,"y":35,"w":1,"l":1},{"x":45,"y":35,"w":1,"l":1},{"x":46,"y":35,"w":1,"l":1},{"x":47,"y":35,"w":1,"l":1},{"x":25,"y":29,"w":1,"l":1},{"x":56,"y":29,"w":1,"l":1},{"x":27,"y":29,"w":1,"l":1},{"x":28,"y":29,"w":1,"l":1},{"x":29,"y":29,"w":1,"l":1},{"x":30,"y":29,"w":1,"l":1},{"x":31,"y":29,"w":1,"l":1},{"x":32,"y":29,"w":1,"l":1},{"x":33,"y":29,"w":1,"l":1},{"x":34,"y":29,"w":1,"l":1},{"x":35,"y":29,"w":1,"l":1},{"x":36,"y":29,"w":1,"l":1},{"x":37,"y":29,"w":1,"l":1},{"x":38,"y":29,"w":1,"l":1},{"x":39,"y":29,"w":1,"l":1},{"x":40,"y":29,"w":1,"l":1},{"x":41,"y":29,"w":1,"l":1},{"x":42,"y":29,"w":1,"l":1},{"x":43,"y":29,"w":1,"l":1},{"x":44,"y":29,"w":1,"l":1},{"x":45,"y":29,"w":1,"l":1},{"x":46,"y":29,"w":1,"l":1},{"x":47,"y":29,"w":1,"l":1},{"x":48,"y":29,"w":1,"l":1},{"x":49,"y":29,"w":1,"l":1},{"x":50,"y":29,"w":1,"l":1},{"x":51,"y":29,"w":1,"l":1},{"x":52,"y":29,"w":1,"l":1},{"x":53,"y":29,"w":1,"l":1},{"x":54,"y":29,"w":1,"l":1},{"x":55,"y":29,"w":1,"l":1},{"x":56,"y":28,"w":1,"l":1},{"x":56,"y":32,"w":1,"l":1},{"x":56,"y":30,"w":1,"l":1},{"x":56,"y":31,"w":1,"l":1},{"x":55,"y":19,"w":1,"l":1},{"x":47,"y":28,"w":1,"l":1},{"x":54,"y":19,"w":1,"l":1},{"x":53,"y":19,"w":1,"l":1},{"x":52,"y":19,"w":1,"l":1},{"x":51,"y":19,"w":1,"l":1},{"x":50,"y":19,"w":1,"l":1},{"x":49,"y":19,"w":1,"l":1},{"x":48,"y":19,"w":1,"l":1},{"x":47,"y":19,"w":1,"l":1},{"x":47,"y":20,"w":1,"l":1},{"x":47,"y":21,"w":1,"l":1},{"x":47,"y":22,"w":1,"l":1},{"x":47,"y":23,"w":1,"l":1},{"x":47,"y":24,"w":1,"l":1},{"x":47,"y":25,"w":1,"l":1},{"x":47,"y":26,"w":1,"l":1},{"x":47,"y":27,"w":1,"l":1},{"x":55,"y":12,"w":1,"l":1},{"x":51,"y":18,"w":1,"l":1},{"x":55,"y":13,"w":1,"l":1},{"x":54,"y":13,"w":1,"l":1},{"x":53,"y":13,"w":1,"l":1},{"x":52,"y":13,"w":1,"l":1},{"x":51,"y":13,"w":1,"l":1},{"x":51,"y":14,"w":1,"l":1},{"x":51,"y":15,"w":1,"l":1},{"x":51,"y":16,"w":1,"l":1},{"x":51,"y":17,"w":1,"l":1},{"x":48,"y":12,"w":1,"l":1},{"x":48,"y":11,"w":1,"l":1},{"x":47,"y":11,"w":1,"l":1},{"x":41,"y":10,"w":1,"l":1},{"x":46,"y":11,"w":1,"l":1},{"x":45,"y":11,"w":1,"l":1},{"x":44,"y":11,"w":1,"l":1},{"x":43,"y":11,"w":1,"l":1},{"x":43,"y":10,"w":1,"l":1},{"x":42,"y":10,"w":1,"l":1},{"x":41,"y":6,"w":1,"l":1},{"x":41,"y":9,"w":1,"l":1},{"x":41,"y":7,"w":1,"l":1},{"x":41,"y":8,"w":1,"l":1},{"x":45,"y":8,"w":1,"l":1},{"x":45,"y":10,"w":1,"l":1},{"x":45,"y":9,"w":1,"l":1},{"x":40,"y":10,"w":1,"l":1},{"x":35,"y":3,"w":1,"l":1},{"x":39,"y":10,"w":1,"l":1},{"x":38,"y":10,"w":1,"l":1},{"x":37,"y":10,"w":1,"l":1},{"x":36,"y":10,"w":1,"l":1},{"x":35,"y":10,"w":1,"l":1},{"x":35,"y":9,"w":1,"l":1},{"x":35,"y":8,"w":1,"l":1},{"x":35,"y":7,"w":1,"l":1},{"x":35,"y":6,"w":1,"l":1},{"x":35,"y":5,"w":1,"l":1},{"x":35,"y":4,"w":1,"l":1},{"x":34,"y":10,"w":1,"l":1},{"x":14,"y":10,"w":1,"l":1},{"x":33,"y":10,"w":1,"l":1},{"x":32,"y":10,"w":1,"l":1},{"x":31,"y":10,"w":1,"l":1},{"x":30,"y":10,"w":1,"l":1},{"x":29,"y":10,"w":1,"l":1},{"x":28,"y":10,"w":1,"l":1},{"x":27,"y":10,"w":1,"l":1},{"x":26,"y":10,"w":1,"l":1},{"x":25,"y":10,"w":1,"l":1},{"x":24,"y":10,"w":1,"l":1},{"x":23,"y":10,"w":1,"l":1},{"x":22,"y":10,"w":1,"l":1},{"x":21,"y":10,"w":1,"l":1},{"x":20,"y":10,"w":1,"l":1},{"x":19,"y":10,"w":1,"l":1},{"x":18,"y":10,"w":1,"l":1},{"x":17,"y":10,"w":1,"l":1},{"x":16,"y":10,"w":1,"l":1},{"x":15,"y":10,"w":1,"l":1},{"x":28,"y":3,"w":1,"l":1},{"x":29,"y":9,"w":1,"l":1},{"x":29,"y":3,"w":1,"l":1},{"x":29,"y":4,"w":1,"l":1},{"x":29,"y":5,"w":1,"l":1},{"x":29,"y":6,"w":1,"l":1},{"x":29,"y":7,"w":1,"l":1},{"x":29,"y":8,"w":1,"l":1},{"x":42,"y":19,"w":1,"l":1},{"x":26,"y":19,"w":1,"l":1},{"x":41,"y":19,"w":1,"l":1},{"x":40,"y":19,"w":1,"l":1},{"x":39,"y":19,"w":1,"l":1},{"x":38,"y":19,"w":1,"l":1},{"x":37,"y":19,"w":1,"l":1},{"x":36,"y":19,"w":1,"l":1},{"x":35,"y":19,"w":1,"l":1},{"x":34,"y":19,"w":1,"l":1},{"x":33,"y":19,"w":1,"l":1},{"x":32,"y":19,"w":1,"l":1},{"x":31,"y":19,"w":1,"l":1},{"x":30,"y":19,"w":1,"l":1},{"x":29,"y":19,"w":1,"l":1},{"x":28,"y":19,"w":1,"l":1},{"x":27,"y":19,"w":1,"l":1},{"x":25,"y":11,"w":1,"l":1},{"x":25,"y":28,"w":1,"l":1},{"x":25,"y":12,"w":1,"l":1},{"x":25,"y":13,"w":1,"l":1},{"x":25,"y":14,"w":1,"l":1},{"x":25,"y":15,"w":1,"l":1},{"x":25,"y":16,"w":1,"l":1},{"x":25,"y":17,"w":1,"l":1},{"x":25,"y":18,"w":1,"l":1},{"x":25,"y":19,"w":1,"l":1},{"x":25,"y":20,"w":1,"l":1},{"x":25,"y":21,"w":1,"l":1},{"x":25,"y":22,"w":1,"l":1},{"x":25,"y":23,"w":1,"l":1},{"x":25,"y":24,"w":1,"l":1},{"x":25,"y":25,"w":1,"l":1},{"x":25,"y":26,"w":1,"l":1},{"x":25,"y":27,"w":1,"l":1},{"x":41,"y":5,"w":1,"l":1},{"x":48,"y":35,"w":1,"l":1},{"x":49,"y":35,"w":1,"l":1},{"x":50,"y":35,"w":1,"l":1},{"x":59,"y":39,"w":1,"l":1},{"x":51,"y":35,"w":1,"l":1},{"x":52,"y":35,"w":1,"l":1},{"x":53,"y":35,"w":1,"l":1},{"x":55,"y":35,"w":1,"l":1},{"x":55,"y":36,"w":1,"l":1},{"x":55,"y":37,"w":1,"l":1},{"x":55,"y":38,"w":1,"l":1},{"x":55,"y":39,"w":1,"l":1},{"x":56,"y":39,"w":1,"l":1},{"x":57,"y":39,"w":1,"l":1},{"x":59,"y":40,"w":1,"l":1},{"x":58,"y":39,"w":1,"l":1},{"x":26,"y":29,"w":1,"l":1},{"x":8,"y":39,"w":1,"l":1},{"x":7,"y":41,"w":1,"l":1},{"x":7,"y":39,"w":1,"l":1},{"x":55,"y":11,"w":1,"l":1},{"x":55,"y":8,"w":1,"l":1},{"x":55,"y":10,"w":1,"l":1},{"x":55,"y":9,"w":1,"l":1},{"x":15,"y":19,"w":1,"l":1},{"x":15,"y":40,"w":1,"l":1},{"x":15,"y":20,"w":1,"l":1},{"x":15,"y":21,"w":1,"l":1},{"x":15,"y":22,"w":1,"l":1},{"x":15,"y":23,"w":1,"l":1},{"x":15,"y":24,"w":1,"l":1},{"x":15,"y":25,"w":1,"l":1},{"x":15,"y":26,"w":1,"l":1},{"x":15,"y":27,"w":1,"l":1},{"x":15,"y":28,"w":1,"l":1},{"x":15,"y":29,"w":1,"l":1},{"x":15,"y":30,"w":1,"l":1},{"x":15,"y":31,"w":1,"l":1},{"x":15,"y":32,"w":1,"l":1},{"x":15,"y":33,"w":1,"l":1},{"x":15,"y":34,"w":1,"l":1},{"x":15,"y":35,"w":1,"l":1},{"x":15,"y":36,"w":1,"l":1},{"x":15,"y":37,"w":1,"l":1},{"x":15,"y":38,"w":1,"l":1},{"x":15,"y":39,"w":1,"l":1},{"x":14,"y":40,"w":1,"l":1},{"x":9,"y":39,"w":1,"l":1},{"x":13,"y":40,"w":1,"l":1},{"x":12,"y":40,"w":1,"l":1},{"x":11,"y":40,"w":1,"l":1},{"x":10,"y":40,"w":1,"l":1},{"x":10,"y":39,"w":1,"l":1},{"x":10,"y":31,"w":1,"l":1},{"x":14,"y":31,"w":1,"l":1},{"x":12,"y":31,"w":1,"l":1},{"x":13,"y":31,"w":1,"l":1},{"x":11,"y":31,"w":1,"l":1},{"x":26,"y":44,"w":1,"l":1},{"x":27,"y":45,"w":1,"l":1},{"x":27,"y":44,"w":1,"l":1},{"x":27,"y":46,"w":1,"l":1},{"x":54,"y":35,"w":1,"l":1},{"x":27,"y":47,"w":1,"l":1},{"x":28,"y":47,"w":1,"l":1},{"x":29,"y":47,"w":1,"l":1},{"x":32,"y":47,"w":1,"l":1},{"x":30,"y":47,"w":1,"l":1},{"x":31,"y":47,"w":1,"l":1},{"x":15,"y":45,"w":1,"l":1},{"x":15,"y":47,"w":1,"l":1},{"x":15,"y":46,"w":1,"l":1},{"x":7,"y":42,"w":1,"l":1},{"x":7,"y":40,"w":1,"l":1},{"x":59,"y":38,"w":1,"l":1},{"x":14,"y":47,"w":1,"l":1},{"x":12,"y":47,"w":1,"l":1},{"x":13,"y":47,"w":1,"l":1},{"x":12,"y":48,"w":1,"l":1},{"x":12,"y":53,"w":1,"l":1},{"x":12,"y":49,"w":1,"l":1},{"x":12,"y":50,"w":1,"l":1},{"x":12,"y":51,"w":1,"l":1},{"x":12,"y":52,"w":1,"l":1}];
+
+const TYPE_COLORS = {
+  main_building:    '#ffc830',
+  generic_building: '#28a882',
+  military:         '#e03838',
+  residential:      '#40b840',
+  hub_main:         '#9040d0',
+  hub_part:         '#b060e8',
+  production:       '#e08820',
+  outpost_ship:     '#28a8d8',
+  off_grid:         '#708888',
+  decoration:       '#d040a8',
+  tower:            '#a8c820',
+  friends_tavern:   '#e04820',
+  greatbuilding:    '#2e5fa3',
+};
+
+const TYPE_LABELS = {
+  main_building:    'Town Hall',
+  generic_building: 'Special / Generic',
+  military:         'Military',
+  residential:      'Residential',
+  hub_main:         'Guild Hub (main)',
+  hub_part:         'Guild Hub (part)',
+  production:       'Production',
+  outpost_ship:     'Outpost / Ship',
+  off_grid:         'Off-grid (UI)',
+  decoration:       'Decoration',
+  tower:            'Tower / Flame',
+  friends_tavern:   'Friends Tavern',
+  greatbuilding:    'Great Building',
+};
+
+const BUILDINGS = [{type:"main_building",name:"Town Hall",x:8,y:8,w:6,l:7,road:false},
+{type:"greatbuilding",name:"Statue of Zeus",x:42,y:5,w:3,l:2,road:false},
+{type:"greatbuilding",name:"Lighthouse of Alexandria",x:11,y:22,w:4,l:4,road:false},
+{type:"residential",name:"Yukitomo Tower - Lv. 10",x:43,y:44,w:4,l:4,road:true},
+{type:"greatbuilding",name:"Alcatraz",x:16,y:0,w:7,l:10,road:false},
+{type:"residential",name:"Giant Kapok",x:42,y:35,w:2,l:2,road:true},
+{type:"residential",name:"Giant Kapok",x:25,y:38,w:2,l:2,road:true},
+{type:"greatbuilding",name:"The Arc",x:9,y:15,w:5,l:7,road:false},
+{type:"greatbuilding",name:"Galata Tower",x:42,y:7,w:3,l:3,road:false},
+{type:"greatbuilding",name:"Castel del Monte",x:36,y:5,w:5,l:5,road:false},
+{type:"production",name:"Koi Pond",x:16,y:29,w:3,l:2,road:false},
+{type:"residential",name:"Enchanted Celtic Tavern",x:5,y:28,w:5,l:6,road:true},
+{type:"greatbuilding",name:"Tower of Babel",x:36,y:0,w:4,l:4,road:false},
+{type:"residential",name:"Jester's Stage",x:42,y:33,w:3,l:2,road:true},
+{type:"residential",name:"Lucky Celtic Goldsmith",x:29,y:25,w:5,l:4,road:true},
+{type:"military",name:"Rogue Den",x:14,y:11,w:2,l:2,road:false},
+{type:"residential",name:"Timeless Junction",x:14,y:8,w:2,l:2,road:false},
+{type:"greatbuilding",name:"ChÃ¢teau Frontenac",x:5,y:34,w:6,l:5,road:false},
+{type:"residential",name:"Flower Arboretum",x:25,y:30,w:2,l:1,road:true},
+{type:"greatbuilding",name:"St. Mark's Basilica",x:23,y:4,w:6,l:6,road:false},
+{type:"residential",name:"Helianthus Arboretum",x:22,y:42,w:3,l:2,road:false},
+{type:"residential",name:"Helianthus Arboretum",x:27,y:33,w:3,l:2,road:false},
+{type:"residential",name:"Eternal Market - Aquatic Horizon",x:20,y:31,w:6,l:6,road:false},
+{type:"residential",name:"Momijidori Shrine",x:26,y:21,w:3,l:8,road:true},
+{type:"residential",name:"Pagoda - Lv. 1",x:33,y:33,w:4,l:4,road:false},
+{type:"residential",name:"Oarcrest Mill",x:23,y:0,w:5,l:4,road:true},
+{type:"residential",name:"Fjordstorm Harbor",x:43,y:19,w:4,l:7,road:true},
+{type:"residential",name:"Celestial Stage of Ages",x:45,y:36,w:4,l:4,road:true},
+{type:"residential",name:"Oarcrest Mill",x:51,y:25,w:5,l:4,road:true},
+{type:"residential",name:"Neo Queen - Lv. 1",x:34,y:27,w:2,l:2,road:false},
+{type:"residential",name:"Little Wishing Well",x:51,y:40,w:2,l:3,road:true},
+{type:"tower",name:"Ritual Flame - Lv. 2",x:47,y:0,w:1,l:2,road:false},
+{type:"residential",name:"Jester's Stage",x:27,y:35,w:3,l:2,road:true},
+{type:"residential",name:"Lagoon Stronghold",x:51,y:20,w:5,l:5,road:true},
+{type:"residential",name:"Oarcrest Falls",x:20,y:11,w:5,l:4,road:true},
+{type:"residential",name:"Astral Viaticum Lighthouse",x:16,y:15,w:5,l:6,road:true},
+{type:"residential",name:"Pirate's Parrot Perch",x:27,y:43,w:3,l:1,road:false},
+{type:"residential",name:"Neo Aviary - Lv. 2",x:47,y:33,w:4,l:2,road:false},
+{type:"residential",name:"Sailmakerâ€™s Atelier",x:40,y:33,w:2,l:2,road:false},
+{type:"residential",name:"Zheng's Golden Bell - Lv. 2",x:44,y:10,w:1,l:1,road:false},
+{type:"residential",name:"Captain's Coconut Paradise",x:30,y:43,w:3,l:1,road:false},
+{type:"residential",name:"Captain's Coconut Paradise",x:38,y:43,w:3,l:1,road:false},
+{type:"residential",name:"Arcadian Whisperwood Watermill",x:27,y:38,w:6,l:5,road:true},
+{type:"residential",name:"Captain's Coconut Paradise",x:37,y:33,w:3,l:1,road:false},
+{type:"residential",name:"Sailmakerâ€™s Workshop - Lv. 1",x:25,y:45,w:2,l:2,road:false},
+{type:"greatbuilding",name:"Cathedral of Aachen",x:26,y:11,w:6,l:4,road:false},
+{type:"residential",name:"Oarcrest Falls",x:20,y:38,w:5,l:4,road:true},
+{type:"residential",name:"Governor's Villa - Lv. 7",x:19,y:26,w:6,l:5,road:true},
+{type:"residential",name:"Little Wishing Well",x:49,y:40,w:2,l:3,road:true},
+{type:"residential",name:"Grilling Grove",x:31,y:33,w:2,l:2,road:false},
+{type:"residential",name:"Grilling Grove",x:34,y:25,w:2,l:2,road:false},
+{type:"residential",name:"Feathered Serpent Statue - Lv. 3",x:49,y:16,w:2,l:3,road:false},
+{type:"greatbuilding",name:"The Blue Galaxy",x:30,y:3,w:5,l:7,road:false},
+{type:"residential",name:"Celestial Stage of Ages",x:26,y:15,w:4,l:4,road:true},
+{type:"residential",name:"Forest Sentinel - Lv. 7",x:29,y:20,w:4,l:5,road:true},
+{type:"greatbuilding",name:"Temple of Relics",x:45,y:2,w:6,l:6,road:false},
+{type:"residential",name:"Grilling Grove",x:51,y:2,w:2,l:2,road:false},
+{type:"residential",name:"Pirate's Parrot Perch",x:26,y:20,w:3,l:1,road:false},
+{type:"residential",name:"Pirate's Parrot Perch",x:60,y:39,w:3,l:1,road:false},
+{type:"tower",name:"Ritual Flame",x:49,y:0,w:1,l:2,road:false},
+{type:"residential",name:"Eco Sanctum",x:37,y:23,w:6,l:6,road:true},
+{type:"residential",name:"Terra Tea Lounge",x:30,y:15,w:2,l:1,road:false},
+{type:"residential",name:"Terra Tea Lounge",x:30,y:16,w:2,l:1,road:false},
+{type:"tower",name:"Ritual Flame - Lv. 2",x:48,y:0,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:55,y:30,w:1,l:2,road:false},
+{type:"residential",name:"Green Guardians Market",x:48,y:20,w:3,l:3,road:false},
+{type:"production",name:"Neo Checkmate Square - Lv. 1",x:12,y:35,w:3,l:3,road:true},
+{type:"tower",name:"Greater Ritual Flame",x:48,y:16,w:1,l:2,road:false},
+{type:"residential",name:"Neo Obelisk  - Lv. 1",x:40,y:35,w:2,l:2,road:true},
+{type:"residential",name:"Green Guardians Market",x:46,y:8,w:3,l:3,road:false},
+{type:"residential",name:"Glimmdrake Riders - Lv. 2",x:39,y:30,w:4,l:3,road:false},
+{type:"tower",name:"Ritual Flame - Lv. 2",x:48,y:14,w:1,l:2,road:false},
+{type:"residential",name:"Breezemill Homestead - Lv. 7",x:33,y:38,w:5,l:6,road:true},
+{type:"residential",name:"Urban Metro Plaza",x:39,y:44,w:4,l:4,road:false},
+{type:"greatbuilding",name:"Observatory",x:16,y:45,w:3,l:3,road:false},
+{type:"decoration",name:"Serpent Spikes",x:49,y:14,w:2,l:2,road:false},
+{type:"residential",name:"Golden Dragon Gong - Lv. 2",x:48,y:18,w:1,l:1,road:false},
+{type:"tower",name:"Ritual Flame - Lv. 2",x:8,y:22,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:8,y:20,w:1,l:2,road:false},
+{type:"residential",name:"Yggdrasil - Lv. 8",x:30,y:0,w:3,l:3,road:false},
+{type:"greatbuilding",name:"Space Carrier",x:44,y:12,w:4,l:7,road:false},
+{type:"residential",name:"Fiore Village - Lv. 9",x:49,y:36,w:6,l:4,road:true},
+{type:"residential",name:"Crimson Dragonâ€™s Breath",x:60,y:33,w:4,l:6,road:true},
+{type:"residential",name:"Mercantile Crossing - Lv. 7",x:16,y:31,w:4,l:6,road:true},
+{type:"residential",name:"Stage of Ages",x:53,y:40,w:4,l:4,road:true},
+{type:"production",name:"Blacksmith",x:48,y:27,w:2,l:2,road:false},
+{type:"production",name:"Blacksmith",x:39,y:17,w:2,l:2,road:false},
+{type:"residential",name:"Golden Dragon Gong - Lv. 2",x:8,y:25,w:1,l:1,road:false},
+{type:"residential",name:"Captain's Coconut Paradise",x:41,y:43,w:3,l:1,road:false},
+{type:"residential",name:"Captain's Coconut Paradise",x:22,y:20,w:3,l:1,road:false},
+{type:"residential",name:"Ribbit Retreat",x:54,y:44,w:2,l:4,road:false},
+{type:"residential",name:"Ribbit Retreat",x:52,y:44,w:2,l:4,road:false},
+{type:"residential",name:"Ribbit Retreat",x:50,y:44,w:2,l:4,road:false},
+{type:"residential",name:"Flower Arboretum",x:48,y:13,w:2,l:1,road:true},
+{type:"greatbuilding",name:"A.I. Core",x:10,y:26,w:5,l:5,road:false},
+{type:"residential",name:"Siren's Rock - Lv. 1",x:12,y:54,w:5,l:2,road:true},
+{type:"tower",name:"Ritual Flame",x:59,y:41,w:1,l:2,road:false},
+{type:"residential",name:"Ironclad Provisions - Lv. 2",x:38,y:40,w:2,l:2,road:false},
+{type:"residential",name:"Ironclad Provisions - Lv. 2",x:5,y:41,w:2,l:2,road:false},
+{type:"residential",name:"Spooktastic Shakes",x:22,y:52,w:2,l:2,road:false},
+{type:"residential",name:"Neo Lunara Bazaar",x:16,y:38,w:4,l:5,road:true},
+{type:"residential",name:"Zheng's Golden Bell - Lv. 2",x:19,y:43,w:1,l:1,road:false},
+{type:"residential",name:"Neo Lunara Bazaar",x:40,y:38,w:4,l:5,road:true},
+{type:"residential",name:"Rattlebones Raveyard - Lv. 2",x:24,y:52,w:4,l:3,road:false},
+{type:"residential",name:"Beastly Burgers",x:32,y:44,w:3,l:3,road:false},
+{type:"decoration",name:"Daunting Tower - Inactive",x:46,y:26,w:1,l:1,road:false},
+{type:"tower",name:"Ritual Flame",x:46,y:0,w:1,l:2,road:false},
+{type:"greatbuilding",name:"Seed Vault",x:57,y:28,w:6,l:5,road:false},
+{type:"residential",name:"Neo Lunara Emporium",x:52,y:14,w:4,l:5,road:false},
+{type:"residential",name:"Neo Colossus - Lv. 9",x:56,y:24,w:4,l:4,road:true},
+{type:"residential",name:"Ribbit Retreat",x:56,y:44,w:2,l:4,road:false},
+{type:"residential",name:"Ribbit Retreat",x:58,y:44,w:2,l:4,road:false},
+{type:"decoration",name:"Daunting Tower - Inactive",x:50,y:27,w:1,l:1,road:false},
+{type:"decoration",name:"Daunting Tower - Inactive",x:50,y:28,w:1,l:1,road:false},
+{type:"decoration",name:"Daunting Tower - Inactive",x:49,y:44,w:1,l:1,road:false},
+{type:"residential",name:"Eerie Nightmare Coaster",x:56,y:11,w:4,l:7,road:true},
+{type:"residential",name:"Neo Shrine of Knowledge - Lv. 2",x:43,y:26,w:3,l:3,road:false},
+{type:"residential",name:"Glimmdrake Riders - Lv. 2",x:47,y:30,w:4,l:3,road:false},
+{type:"residential",name:"Crimson Dragonâ€™s Breath",x:39,y:11,w:4,l:6,road:true},
+{type:"residential",name:"Royal Midnight Clock Tower",x:32,y:15,w:4,l:4,road:true},
+{type:"residential",name:"Neo Bazaar - Lv. 8",x:33,y:20,w:4,l:5,road:true},
+{type:"residential",name:"Glimmdrake Riders - Lv. 2",x:43,y:30,w:4,l:3,road:false},
+{type:"residential",name:"Jolly Oink Pigsty",x:45,y:40,w:4,l:3,road:false},
+{type:"residential",name:"Neo Clocktower - Lv. 1",x:41,y:17,w:3,l:2,road:true},
+{type:"residential",name:"Neo Shrine of Knowledge - Lv. 2",x:35,y:48,w:3,l:3,road:false},
+{type:"residential",name:"Arcadian Whisperwood Watermill",x:19,y:21,w:6,l:5,road:true},
+{type:"residential",name:"Metro Station - Lv. 5",x:35,y:44,w:4,l:4,road:false},
+{type:"residential",name:"Sled Pup Monument",x:47,y:46,w:3,l:2,road:false},
+{type:"production",name:"Blacksmith",x:20,y:42,w:2,l:2,road:false},
+{type:"production",name:"Blacksmith",x:28,y:1,w:2,l:2,road:false},
+{type:"residential",name:"Starlight Boulevard Kiosk",x:21,y:20,w:1,l:1,road:false},
+{type:"residential",name:"Joyful Nutcracker Guardhouse",x:47,y:44,w:2,l:2,road:true},
+{type:"residential",name:"Joyful Nutcracker Guardhouse",x:25,y:42,w:2,l:2,road:true},
+{type:"residential",name:"Skuddeholm Stead",x:48,y:23,w:3,l:4,road:false},
+{type:"residential",name:"Neo Fashion Boutique - Lv. 2",x:25,y:40,w:2,l:2,road:false},
+{type:"decoration",name:"Forgotten Temple - Inactive",x:56,y:8,w:4,l:3,road:false},
+{type:"tower",name:"Ritual Flame",x:63,y:28,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:63,y:30,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:45,y:0,w:1,l:2,road:false},
+{type:"residential",name:"Arcadian Whisperwood Watermill",x:49,y:8,w:6,l:5,road:true},
+{type:"residential",name:"Neo Lunara Bazaar",x:51,y:30,w:4,l:5,road:true},
+{type:"residential",name:"Yukitomo Tower - Lv. 5",x:60,y:40,w:4,l:4,road:true},
+{type:"residential",name:"Holly Hauler",x:33,y:47,w:2,l:4,road:false},
+{type:"tower",name:"Ritual Flame",x:26,y:31,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:26,y:33,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:26,y:35,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:46,y:27,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:30,y:33,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:55,y:33,w:1,l:2,road:false},
+{type:"tower",name:"Greater Ritual Flame",x:8,y:18,w:1,l:2,road:false},
+{type:"tower",name:"Greater Ritual Flame",x:8,y:16,w:1,l:2,road:false},
+{type:"residential",name:"Nutcracker Guardhouse",x:8,y:40,w:2,l:2,road:true},
+{type:"residential",name:"Harvest Hub",x:8,y:26,w:2,l:2,road:false},
+{type:"residential",name:"Crimson Dragonâ€™s Breath",x:56,y:18,w:4,l:6,road:true},
+{type:"residential",name:"Neo Fashion Boutique - Lv. 2",x:10,y:32,w:2,l:2,road:false},
+{type:"greatbuilding",name:"Arctic Orangery",x:53,y:1,w:7,l:7,road:false},
+{type:"greatbuilding",name:"Terracotta Army",x:32,y:11,w:6,l:4,road:false},
+{type:"residential",name:"Ascended Snowdrop Garden",x:36,y:16,w:3,l:3,road:false},
+{type:"residential",name:"Ribbit Retreat",x:51,y:4,w:2,l:4,road:false},
+{type:"residential",name:"Booâ€™loon Spectral FairÂ - Lv. 8",x:4,y:43,w:5,l:5,road:true},
+{type:"residential",name:"Momijidori Shrine",x:16,y:21,w:3,l:8,road:true},
+{type:"greatbuilding",name:"The Kraken",x:40,y:0,w:5,l:5,road:false},
+{type:"residential",name:"Warforge Trench - Lv. 2",x:43,y:12,w:1,l:3,road:false},
+{type:"residential",name:"Warforge Trench - Lv. 2",x:38,y:11,w:1,l:3,road:false},
+{type:"residential",name:"Neo Menagerie - Lv. 2",x:28,y:44,w:4,l:3,road:false},
+{type:"production",name:"Neo Checkmate Square - Lv. 1",x:12,y:32,w:3,l:3,road:true},
+{type:"tower",name:"Watchfire - Lv. 1",x:49,y:45,w:1,l:1,road:false},
+{type:"residential",name:"Neo Ziggurat - Lv. 1",x:33,y:0,w:3,l:3,road:true},
+{type:"residential",name:"Neo Menagerie - Lv. 2",x:16,y:12,w:4,l:3,road:false},
+{type:"greatbuilding",name:"The Virgo Project",x:22,y:47,w:5,l:5,road:false},
+{type:"production",name:"Koi Pond",x:22,y:45,w:3,l:2,road:false},
+{type:"residential",name:"Ascended Snowdrop Garden",x:19,y:48,w:3,l:3,road:false},
+{type:"residential",name:"Blueberry Field",x:57,y:41,w:2,l:3,road:false},
+{type:"residential",name:"Sheep Shire",x:11,y:34,w:1,l:3,road:false},
+{type:"production",name:"Koi Pond",x:50,y:0,w:3,l:2,road:false},
+{type:"decoration",name:"Lv. 2 - Sakura Rock",x:12,y:38,w:3,l:2,road:false},
+{type:"residential",name:"Little Wishing Well",x:27,y:48,w:2,l:3,road:true},
+{type:"residential",name:"Little Wishing Well",x:29,y:48,w:2,l:3,road:true},
+{type:"residential",name:"Little Wishing Well",x:31,y:48,w:2,l:3,road:true},
+{type:"residential",name:"Holly Hauler",x:38,y:48,w:2,l:4,road:false},
+{type:"residential",name:"Sheep Shire",x:14,y:19,w:1,l:3,road:false},
+{type:"residential",name:"Zheng's Golden Bell - Lv. 2",x:38,y:14,w:1,l:1,road:false},
+{type:"residential",name:"Zheng's Golden Bell - Lv. 2",x:38,y:15,w:1,l:1,road:false},
+{type:"residential",name:"Zheng's Golden Bell - Lv. 2",x:37,y:15,w:1,l:1,road:false},
+{type:"residential",name:"Zheng's Golden Bell - Lv. 2",x:36,y:15,w:1,l:1,road:false},
+{type:"residential",name:"Zheng's Golden Bell - Lv. 2",x:43,y:16,w:1,l:1,road:false},
+{type:"residential",name:"Neo Bazaar - Lv. 8",x:21,y:15,w:4,l:5,road:true},
+{type:"residential",name:"Warforge Trench - Lv. 2",x:36,y:26,w:1,l:3,road:false},
+{type:"residential",name:"Ironclad Provisions - Lv. 2",x:5,y:39,w:2,l:2,road:false},
+{type:"residential",name:"Warforge Trench - Lv. 2",x:11,y:37,w:1,l:3,road:false},
+{type:"residential",name:"Neo Fashion Boutique - Lv. 2",x:38,y:38,w:2,l:2,road:false},
+{type:"residential",name:"Flower Arboretum",x:36,y:4,w:2,l:1,road:true},
+{type:"residential",name:"Flower Arboretum",x:57,y:40,w:2,l:1,road:true},
+{type:"residential",name:"Flower Arboretum",x:16,y:43,w:2,l:1,road:true},
+{type:"residential",name:"Flower Arboretum",x:16,y:11,w:2,l:1,road:true},
+{type:"residential",name:"Neo Bazaar - Lv. 8",x:56,y:33,w:4,l:5,road:true},
+{type:"residential",name:"Urban Metro Plaza",x:60,y:44,w:4,l:4,road:false},
+{type:"residential",name:"Hippo Lagoon",x:45,y:33,w:2,l:2,road:false},
+{type:"residential",name:"Ironclad Provisions - Lv. 1",x:30,y:17,w:2,l:2,road:true},
+{type:"residential",name:"Astral Viaticum Lighthouse",x:10,y:41,w:5,l:6,road:true},
+{type:"tower",name:"Greater Ritual Flame",x:4,y:28,w:1,l:2,road:false},
+{type:"tower",name:"Greater Ritual Flame",x:4,y:30,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:4,y:32,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:4,y:34,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:4,y:36,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:4,y:38,w:1,l:2,road:false},
+{type:"tower",name:"Ritual Flame",x:4,y:40,w:1,l:2,road:false},
+{type:"residential",name:"Ascended Meridian Sun Dial",x:19,y:45,w:3,l:3,road:false},
+{type:"residential",name:"Fountain of Youth",x:37,y:34,w:3,l:3,road:true},
+{type:"residential",name:"Harmonious World Expo",x:13,y:48,w:4,l:6,road:false},
+{type:"residential",name:"Ascended Helianthus Arboretum",x:30,y:35,w:3,l:2,road:false},
+{type:"residential",name:"Mk I Anomaly Extractor - Lv. 6",x:37,y:20,w:6,l:3,road:true},
+{type:"decoration",name:"Tourney Grounds - Active",x:27,y:30,w:4,l:3,road:false},
+{type:"decoration",name:"Tourney Grounds - Active",x:31,y:30,w:4,l:3,road:false},
+{type:"decoration",name:"Tourney Grounds - Active",x:35,y:30,w:4,l:3,road:false},
+{type:"residential",name:"Holly Hauler",x:9,y:22,w:2,l:4,road:false}];
+
+const GREAT_BUILDINGS = [
+  {name:"Statue of Zeus",        x:42, y:5,  w:3, l:2,  level:88},
+  {name:"Lighthouse of Alexandria", x:11, y:22, w:4, l:4, level:87},
+  {name:"Alcatraz",              x:16, y:0,  w:7, l:10, level:117},
+  {name:"The Arc",               x:9,  y:15, w:5, l:7,  level:159},
+  {name:"Galata Tower",          x:42, y:7,  w:3, l:3,  level:80},
+  {name:"Castel del Monte",      x:36, y:5,  w:5, l:5,  level:85},
+  {name:"Tower of Babel",        x:36, y:0,  w:4, l:4,  level:89},
+  {name:"ChÃ¢teau Frontenac",     x:5,  y:34, w:6, l:5,  level:83},
+  {name:"St. Mark's Basilica",   x:23, y:4,  w:6, l:6,  level:76},
+  {name:"Cathedral of Aachen",   x:26, y:11, w:6, l:4,  level:87},
+  {name:"The Blue Galaxy",       x:30, y:3,  w:5, l:7,  level:80},
+  {name:"Temple of Relics",      x:45, y:2,  w:6, l:6,  level:85},
+  {name:"Observatory",           x:16, y:45, w:3, l:3,  level:87},
+  {name:"Space Carrier",         x:44, y:12, w:4, l:7,  level:78},
+  {name:"A.I. Core",             x:10, y:26, w:5, l:5,  level:82},
+  {name:"Seed Vault",            x:57, y:28, w:6, l:5,  level:83},
+  {name:"Arctic Orangery",       x:53, y:1,  w:7, l:7,  level:83},
+  {name:"Terracotta Army",       x:32, y:11, w:6, l:4,  level:82},
+  {name:"The Kraken",            x:40, y:0,  w:5, l:5,  level:82},
+  {name:"The Virgo Project",     x:22, y:47, w:5, l:5,  level:77},
+];
+
+const UNLOCKED_AREAS = [{"x":4,"y":28,"width":4,"length":4},{"x":4,"y":32,"width":4,"length":4},{"x":4,"y":36,"width":4,"length":4},{"x":4,"y":40,"width":4,"length":4},{"x":4,"y":44,"width":4,"length":4},{"x":8,"y":8,"width":16,"length":16},{"x":8,"y":24,"width":4,"length":4},{"x":8,"y":28,"width":4,"length":4},{"x":8,"y":32,"width":4,"length":4},{"x":8,"y":36,"width":4,"length":4},{"x":8,"y":40,"width":4,"length":4},{"x":8,"y":44,"width":4,"length":4},{"x":12,"y":24,"width":4,"length":4},{"x":12,"y":28,"width":4,"length":4},{"x":12,"y":32,"width":4,"length":4},{"x":12,"y":36,"width":4,"length":4},{"x":12,"y":40,"width":4,"length":4},{"x":12,"y":44,"width":4,"length":4},{"x":12,"y":48,"width":4,"length":4},{"x":12,"y":52,"width":4,"length":4},{"x":16,"y":0,"width":4,"length":4},{"x":16,"y":4,"width":4,"length":4},{"x":16,"y":24,"width":4,"length":4},{"x":16,"y":28,"width":4,"length":4},{"x":16,"y":32,"width":4,"length":4},{"x":16,"y":36,"width":4,"length":4},{"x":16,"y":40,"width":4,"length":4},{"x":16,"y":44,"width":4,"length":4},{"x":16,"y":48,"width":4,"length":4},{"x":16,"y":52,"width":4,"length":4},{"x":20,"y":0,"width":4,"length":4},{"x":20,"y":4,"width":4,"length":4},{"x":20,"y":24,"width":4,"length":4},{"x":20,"y":28,"width":4,"length":4},{"x":20,"y":32,"width":4,"length":4},{"x":20,"y":36,"width":4,"length":4},{"x":20,"y":40,"width":4,"length":4},{"x":20,"y":44,"width":4,"length":4},{"x":20,"y":48,"width":4,"length":4},{"x":20,"y":52,"width":4,"length":4},{"x":24,"y":0,"width":4,"length":4},{"x":24,"y":4,"width":4,"length":4},{"x":24,"y":8,"width":4,"length":4},{"x":24,"y":12,"width":4,"length":4},{"x":24,"y":16,"width":4,"length":4},{"x":24,"y":20,"width":4,"length":4},{"x":24,"y":24,"width":4,"length":4},{"x":24,"y":28,"width":4,"length":4},{"x":24,"y":32,"width":4,"length":4},{"x":24,"y":36,"width":4,"length":4},{"x":24,"y":40,"width":4,"length":4},{"x":24,"y":44,"width":4,"length":4},{"x":24,"y":48,"width":4,"length":4},{"x":24,"y":52,"width":4,"length":4},{"x":28,"y":0,"width":4,"length":4},{"x":28,"y":4,"width":4,"length":4},{"x":28,"y":8,"width":4,"length":4},{"x":28,"y":12,"width":4,"length":4},{"x":28,"y":16,"width":4,"length":4},{"x":28,"y":20,"width":4,"length":4},{"x":28,"y":24,"width":4,"length":4},{"x":28,"y":28,"width":4,"length":4},{"x":28,"y":32,"width":4,"length":4},{"x":28,"y":36,"width":4,"length":4},{"x":28,"y":40,"width":4,"length":4},{"x":28,"y":44,"width":4,"length":4},{"x":28,"y":48,"width":4,"length":4},{"x":32,"y":0,"width":4,"length":4},{"x":32,"y":4,"width":4,"length":4},{"x":32,"y":8,"width":4,"length":4},{"x":32,"y":12,"width":4,"length":4},{"x":32,"y":16,"width":4,"length":4},{"x":32,"y":20,"width":4,"length":4},{"x":32,"y":24,"width":4,"length":4},{"x":32,"y":28,"width":4,"length":4},{"x":32,"y":32,"width":4,"length":4},{"x":32,"y":36,"width":4,"length":4},{"x":32,"y":40,"width":4,"length":4},{"x":32,"y":44,"width":4,"length":4},{"x":32,"y":48,"width":4,"length":4},{"x":36,"y":0,"width":4,"length":4},{"x":36,"y":4,"width":4,"length":4},{"x":36,"y":8,"width":4,"length":4},{"x":36,"y":12,"width":4,"length":4},{"x":36,"y":16,"width":4,"length":4},{"x":36,"y":20,"width":4,"length":4},{"x":36,"y":24,"width":4,"length":4},{"x":36,"y":28,"width":4,"length":4},{"x":36,"y":32,"width":4,"length":4},{"x":36,"y":36,"width":4,"length":4},{"x":36,"y":40,"width":4,"length":4},{"x":36,"y":44,"width":4,"length":4},{"x":36,"y":48,"width":4,"length":4},{"x":40,"y":0,"width":4,"length":4},{"x":40,"y":4,"width":4,"length":4},{"x":40,"y":8,"width":4,"length":4},{"x":40,"y":12,"width":4,"length":4},{"x":40,"y":16,"width":4,"length":4},{"x":40,"y":20,"width":4,"length":4},{"x":40,"y":24,"width":4,"length":4},{"x":40,"y":28,"width":4,"length":4},{"x":40,"y":32,"width":4,"length":4},{"x":40,"y":36,"width":4,"length":4},{"x":40,"y":40,"width":4,"length":4},{"x":40,"y":44,"width":4,"length":4},{"x":44,"y":0,"width":4,"length":4},{"x":44,"y":4,"width":4,"length":4},{"x":44,"y":8,"width":4,"length":4},{"x":44,"y":12,"width":4,"length":4},{"x":44,"y":16,"width":4,"length":4},{"x":44,"y":20,"width":4,"length":4},{"x":44,"y":24,"width":4,"length":4},{"x":44,"y":28,"width":4,"length":4},{"x":44,"y":32,"width":4,"length":4},{"x":44,"y":36,"width":4,"length":4},{"x":44,"y":40,"width":4,"length":4},{"x":44,"y":44,"width":4,"length":4},{"x":48,"y":0,"width":4,"length":4},{"x":48,"y":4,"width":4,"length":4},{"x":48,"y":8,"width":4,"length":4},{"x":48,"y":12,"width":4,"length":4},{"x":48,"y":16,"width":4,"length":4},{"x":48,"y":20,"width":4,"length":4},{"x":48,"y":24,"width":4,"length":4},{"x":48,"y":28,"width":4,"length":4},{"x":48,"y":32,"width":4,"length":4},{"x":48,"y":36,"width":4,"length":4},{"x":48,"y":40,"width":4,"length":4},{"x":48,"y":44,"width":4,"length":4},{"x":52,"y":0,"width":4,"length":4},{"x":52,"y":4,"width":4,"length":4},{"x":52,"y":8,"width":4,"length":4},{"x":52,"y":12,"width":4,"length":4},{"x":52,"y":16,"width":4,"length":4},{"x":52,"y":20,"width":4,"length":4},{"x":52,"y":24,"width":4,"length":4},{"x":52,"y":28,"width":4,"length":4},{"x":52,"y":32,"width":4,"length":4},{"x":52,"y":36,"width":4,"length":4},{"x":52,"y":40,"width":4,"length":4},{"x":52,"y":44,"width":4,"length":4},{"x":56,"y":0,"width":4,"length":4},{"x":56,"y":4,"width":4,"length":4},{"x":56,"y":8,"width":4,"length":4},{"x":56,"y":12,"width":4,"length":4},{"x":56,"y":16,"width":4,"length":4},{"x":56,"y":20,"width":4,"length":4},{"x":56,"y":24,"width":4,"length":4},{"x":56,"y":28,"width":4,"length":4},{"x":56,"y":32,"width":4,"length":4},{"x":56,"y":36,"width":4,"length":4},{"x":56,"y":40,"width":4,"length":4},{"x":56,"y":44,"width":4,"length":4},{"x":60,"y":28,"width":4,"length":4},{"x":60,"y":32,"width":4,"length":4},{"x":60,"y":36,"width":4,"length":4},{"x":60,"y":40,"width":4,"length":4},{"x":60,"y":44,"width":4,"length":4}];
+
+// â”€â”€ compute grid extent â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+for (const a of UNLOCKED_AREAS) {
+  const x = a.x ?? 0, y = a.y ?? 0;
+  minX = Math.min(minX, x);
+  minY = Math.min(minY, y);
+  maxX = Math.max(maxX, x + a.width);
+  maxY = Math.max(maxY, y + a.length);
+}
+
+const PAD = 4;           // extra cells of empty space around the city
+const CELL = 13;         // pixels per grid cell
+const AXIS_W = 32;       // left axis label area
+const AXIS_H = 22;       // top axis label area
+
+const gridX0 = Math.max(0, minX - PAD);
+const gridY0 = Math.max(0, minY - PAD);
+const gridX1 = maxX + PAD;
+const gridY1 = maxY + PAD;
+const cols = gridX1 - gridX0;
+const rows = gridY1 - gridY0;
+
+// â”€â”€ build unlocked cell lookup (flat typed array) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const unlocked = new Uint8Array(cols * rows);
+for (const a of UNLOCKED_AREAS) {
+  const x = a.x ?? 0, y = a.y ?? 0;
+  for (let dy = 0; dy < a.length; dy++) {
+    for (let dx = 0; dx < a.width; dx++) {
+      const cx = x + dx - gridX0;
+      const cy = y + dy - gridY0;
+      if (cx >= 0 && cy >= 0 && cx < cols && cy < rows)
+        unlocked[cy * cols + cx] = 1;
+    }
+  }
+}
+
+// â”€â”€ canvas setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const canvas = document.getElementById('grid');
+canvas.width  = AXIS_W + cols * CELL + 1;
+canvas.height = AXIS_H + rows * CELL + 1;
+const ctx = canvas.getContext('2d');
+
+// â”€â”€ colours â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const C_UNLOCKED   = '#b89a5e';
+const C_LOCKED     = '#1e3248';
+const C_GRID_FINE  = 'rgba(255,255,255,0.07)';
+const C_GRID_CHUNK = 'rgba(100,160,220,0.25)';
+const C_AXIS_BG    = '#141e2a';
+const C_AXIS_TXT   = '#8a9ab0';
+const C_ROAD_1x1   = '#4a5560';
+const C_ROAD_2x2   = '#5a6a40';
+const C_ROAD_MARK  = 'rgba(255,255,255,0.18)';
+const C_GB_FILL    = '#2e5fa3';
+const C_GB_BORDER  = '#70b8ff';
+const C_GB_TEXT    = '#d8eeff';
+
+// â”€â”€ draw cells â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+for (let row = 0; row < rows; row++) {
+  for (let col = 0; col < cols; col++) {
+    ctx.fillStyle = unlocked[row * cols + col] ? C_UNLOCKED : C_LOCKED;
+    ctx.fillRect(
+      AXIS_W + col * CELL,
+      AXIS_H + row * CELL,
+      CELL, CELL
+    );
+  }
+}
+
+// â”€â”€ grid lines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// fine lines (every cell)
+ctx.strokeStyle = C_GRID_FINE;
+ctx.lineWidth = 0.5;
+for (let col = 0; col <= cols; col++) {
+  const px = AXIS_W + col * CELL + 0.5;
+  ctx.beginPath(); ctx.moveTo(px, AXIS_H); ctx.lineTo(px, AXIS_H + rows * CELL); ctx.stroke();
+}
+for (let row = 0; row <= rows; row++) {
+  const py = AXIS_H + row * CELL + 0.5;
+  ctx.beginPath(); ctx.moveTo(AXIS_W, py); ctx.lineTo(AXIS_W + cols * CELL, py); ctx.stroke();
+}
+
+// chunk lines (every 4 cells)
+ctx.strokeStyle = C_GRID_CHUNK;
+ctx.lineWidth = 1;
+for (let col = 0; col <= cols; col++) {
+  if ((col + gridX0) % 4 !== 0) continue;
+  const px = AXIS_W + col * CELL + 0.5;
+  ctx.beginPath(); ctx.moveTo(px, AXIS_H); ctx.lineTo(px, AXIS_H + rows * CELL); ctx.stroke();
+}
+for (let row = 0; row <= rows; row++) {
+  if ((row + gridY0) % 4 !== 0) continue;
+  const py = AXIS_H + row * CELL + 0.5;
+  ctx.beginPath(); ctx.moveTo(AXIS_W, py); ctx.lineTo(AXIS_W + cols * CELL, py); ctx.stroke();
+}
+
+// â”€â”€ axis labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ctx.fillStyle = C_AXIS_BG;
+ctx.fillRect(0, 0, canvas.width, AXIS_H);
+ctx.fillRect(0, 0, AXIS_W, canvas.height);
+
+ctx.fillStyle = C_AXIS_TXT;
+ctx.font = '9px monospace';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+
+// x labels (every 4 cells)
+for (let col = 0; col <= cols; col++) {
+  const gx = col + gridX0;
+  if (gx % 8 !== 0) continue;
+  ctx.fillText(gx, AXIS_W + col * CELL, AXIS_H / 2);
+}
+
+// y labels (every 4 cells)
+ctx.textAlign = 'right';
+for (let row = 0; row <= rows; row++) {
+  const gy = row + gridY0;
+  if (gy % 8 !== 0) continue;
+  ctx.fillText(gy, AXIS_W - 3, AXIS_H + row * CELL + CELL / 2);
+}
+
+// â”€â”€ draw roads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+for (const r of ROADS) {
+  const px = AXIS_W + (r.x - gridX0) * CELL;
+  const py = AXIS_H + (r.y - gridY0) * CELL;
+  const pw = r.w * CELL;
+  const ph = r.l * CELL;
+
+  ctx.fillStyle = r.w === 1 ? C_ROAD_1x1 : C_ROAD_2x2;
+  ctx.fillRect(px, py, pw, ph);
+
+  // centre stripe for 2x2 car streets
+  if (r.w === 2) {
+    ctx.strokeStyle = C_ROAD_MARK;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    const cx = px + pw / 2 + 0.5;
+    ctx.beginPath(); ctx.moveTo(cx, py + 2); ctx.lineTo(cx, py + ph - 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// â”€â”€ draw buildings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+for (const b of BUILDINGS) {
+  const px = AXIS_W + (b.x - gridX0) * CELL;
+  const py = AXIS_H + (b.y - gridY0) * CELL;
+  const pw = b.w * CELL;
+  const ph = b.l * CELL;
+  // skip anything fully outside the canvas
+  if (px + pw <= AXIS_W || py + ph <= AXIS_H ||
+      px >= AXIS_W + cols * CELL || py >= AXIS_H + rows * CELL) continue;
+
+  const color = TYPE_COLORS[b.type] || '#888888';
+  ctx.fillStyle = color;
+  ctx.fillRect(px, py, pw, ph);
+
+  // thin dark border so adjacent same-color cells are distinguishable
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+
+  // road indicator — orange dot at top-right if road access is required
+  if (b.road) {
+    ctx.fillStyle = '#ff8800';
+    ctx.beginPath();
+    ctx.arc(px + pw - 3, py + 3, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // label for buildings 3+ cells wide and 3+ cells tall
+  if (b.w >= 3 && b.l >= 3) {
+    const words = b.name.split(' ');
+    const fontSize = 8;
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const maxW = pw - 4, lineH = fontSize + 2;
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width <= maxW) { line = test; }
+      else { if (line) lines.push(line); line = word; }
+    }
+    if (line) lines.push(line);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(px + 2, py + 2, maxW, ph - 4); ctx.clip();
+    const startY = py + 2 + Math.max(0, (ph - 4 - lines.length * lineH) / 2);
+    lines.forEach((l, i) => ctx.fillText(l, px + 2, startY + i * lineH));
+    ctx.restore();
+  }
+}
+
+// â”€â”€ draw great buildings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+for (const gb of GREAT_BUILDINGS) {
+  const px = AXIS_W + (gb.x - gridX0) * CELL;
+  const py = AXIS_H + (gb.y - gridY0) * CELL;
+  const pw = gb.w * CELL;
+  const ph = gb.l * CELL;
+
+  // fill
+  ctx.fillStyle = C_GB_FILL;
+  ctx.fillRect(px, py, pw, ph);
+
+  // border
+  ctx.strokeStyle = C_GB_BORDER;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(px + 1, py + 1, pw - 2, ph - 2);
+
+  // label â€” word-wrap into the rectangle
+  const padX = 3, padY = 3;
+  const maxW = pw - padX * 2;
+  const maxH = ph - padY * 2;
+  if (maxW > 10 && maxH > 10) {
+    ctx.fillStyle = C_GB_TEXT;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    // pick font size: 8px for small buildings, 9px for larger
+    const fontSize = (pw >= 6 * CELL && ph >= 6 * CELL) ? 9 : 8;
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    const lineH = fontSize + 2;
+
+    // wrap words
+    const words = gb.name.split(' ');
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width <= maxW) {
+        line = test;
+      } else {
+        if (line) lines.push(line);
+        line = word;
+      }
+    }
+    if (line) lines.push(line);
+
+    // level line
+    lines.push(`Lv ${gb.level}`);
+
+    // clip and draw
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(px + padX, py + padY, maxW, maxH);
+    ctx.clip();
+    const totalH = lines.length * lineH;
+    const startY = py + padY + Math.max(0, (maxH - totalH) / 2);
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], px + padX, startY + i * lineH);
+    }
+    ctx.restore();
+  }
+}
+
+// â”€â”€ stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const totalUnlocked = unlocked.reduce((s, v) => s + v, 0);
+const roadRequired = BUILDINGS.filter(b => b.road).length;
+const roadFree = BUILDINGS.filter(b => !b.road && b.type !== 'greatbuilding').length;
+document.getElementById('stats').textContent =
+  `Grid shown: x ${gridX0}â€”${gridX1}, y ${gridY0}â€”${gridY1}  |  ` +
+  `Unlocked cells: ${totalUnlocked}  |  ` +
+  `Great Buildings: ${GREAT_BUILDINGS.length}  |  ` +
+  `Road-required: ${roadRequired}  |  Road-free: ${roadFree}  |  ` +
+  `Road segments: ${ROADS.length}`;
+
+// â”€â”€ building cell lookup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const buildingCell = new Map();
+for (const b of BUILDINGS) {
+  for (let dy = 0; dy < b.l; dy++)
+    for (let dx = 0; dx < b.w; dx++)
+      buildingCell.set(`${b.x + dx},${b.y + dy}`, b);
+}
+
+// â”€â”€ road cell lookup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// store road type per cell for tooltip ('1x1' or '2x2')
+const roadCell = new Map();
+for (const r of ROADS) {
+  for (let dy = 0; dy < r.l; dy++)
+    for (let dx = 0; dx < r.w; dx++)
+      roadCell.set(`${r.x + dx},${r.y + dy}`, r.w === 1 ? 'Cobblestone (1Ã—1)' : 'Car Street (2Ã—2)');
+}
+
+// â”€â”€ hover tooltip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const tooltip = document.getElementById('tooltip');
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  const col = Math.floor((px - AXIS_W) / CELL);
+  const row = Math.floor((py - AXIS_H) / CELL);
+  if (col < 0 || row < 0 || col >= cols || row >= rows) {
+    tooltip.style.display = 'none'; return;
+  }
+  const gx = col + gridX0, gy = row + gridY0;
+
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 10) + 'px';
+
+  const gb = GREAT_BUILDINGS.find(b =>
+    gx >= b.x && gx < b.x + b.w && gy >= b.y && gy < b.y + b.l
+  );
+  if (gb) {
+    tooltip.innerHTML =
+      `<strong>&#9733; ${gb.name}</strong>` +
+      `Level ${gb.level} &nbsp;|&nbsp; ${gb.w}&times;${gb.l} &nbsp;|&nbsp; (${gb.x}, ${gb.y})`;
+    return;
+  }
+
+  const bldg = buildingCell.get(`${gx},${gy}`);
+  if (bldg) {
+    const label = TYPE_LABELS[bldg.type] || bldg.type;
+    const roadTag = bldg.road
+      ? ' &nbsp;<span style="color:#ff8800">&#x1F6E3; Road needed</span>'
+      : ' &nbsp;<span style="color:#88cc88">&#x2714; No road</span>';
+    tooltip.innerHTML = `<strong>${bldg.name}</strong>${label} &nbsp;|&nbsp; ${bldg.w}&times;${bldg.l} &nbsp;|&nbsp; (${bldg.x}, ${bldg.y})${roadTag}`;
+    return;
+  }
+
+  const road = roadCell.get(`${gx},${gy}`);
+  if (road) {
+    tooltip.innerHTML = `<strong>&#9644; Road</strong>${road} &nbsp;|&nbsp; (${gx}, ${gy})`;
+    return;
+  }
+
+  const state = unlocked[row * cols + col] ? 'Unlocked' : 'Locked';
+  tooltip.textContent = `(${gx}, ${gy})  â€”  ${state}`;
+});
+canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+</script>
+</body>
+</html>
+
