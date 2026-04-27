@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoE City Planner</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #1a2230; color: #d0c8b0; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+/* ── Import screen ─────────────────────────────────────────────── */
+#import-screen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 24px;
+}
+.import-card {
+  background: #1e2d3d; border: 1px solid #2a4060; border-radius: 12px;
+  padding: 40px 48px; max-width: 540px; width: 100%; text-align: center;
+}
+.import-card h1 { font-size: 1.9rem; color: #e8d8a0; letter-spacing: 1px; margin-bottom: 6px; }
+.import-card .tagline { font-size: 0.85rem; color: #7a8a9a; margin-bottom: 32px; }
+
+.steps { background: #141e2a; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: left; }
+.step { font-size: 0.82rem; color: #9ab0c0; padding: 5px 0 5px 28px; position: relative; }
+.step .n { position: absolute; left: 0; color: #e8d8a0; font-weight: bold; }
+.step strong { color: #c8d8b0; }
+
+.primary-btn {
+  background: #2e6da4; color: #e8f4ff; border: none; border-radius: 8px;
+  padding: 14px 28px; font-size: 1rem; cursor: pointer; width: 100%;
+  font-weight: 600; letter-spacing: 0.3px; transition: background 0.15s;
+}
+.primary-btn:hover { background: #3a7fbf; }
+.primary-btn:active { background: #1a5080; }
+
+.divider { color: #4a5a6a; font-size: 0.8rem; margin: 18px 0; }
+.file-label { display: inline-block; color: #6a9ab8; font-size: 0.85rem; cursor: pointer; text-decoration: underline; }
+.file-label:hover { color: #8ab8d8; }
+
+#error-msg {
+  margin-top: 18px; background: #3d1a1a; border: 1px solid #a04040;
+  border-radius: 6px; padding: 10px 14px; font-size: 0.82rem;
+  color: #e09080; text-align: left; display: none;
+}
+#loading-msg { margin-top: 18px; color: #8a9aaa; font-size: 0.82rem; display: none; }
+.clipboard-note { margin-top: 20px; font-size: 0.74rem; color: #4a5a6a; line-height: 1.5; }
+
+/* ── Viewer screen ─────────────────────────────────────────────── */
+#viewer-screen { display: none; padding: 20px; }
+
+.toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 4px; }
+.toolbar h1 { font-size: 1.2rem; color: #e8d8a0; letter-spacing: 1px; }
+.back-btn {
+  margin-left: auto; background: #1e2d3d; color: #8ab8d8;
+  border: 1px solid #2a4060; border-radius: 6px;
+  padding: 6px 14px; font-size: 0.8rem; cursor: pointer;
+}
+.back-btn:hover { background: #243545; }
+
+.subtitle { font-size: 0.78rem; color: #7a8a9a; margin-bottom: 16px; }
+
+#tooltip {
+  position: fixed; pointer-events: none;
+  background: rgba(10,18,28,0.92); border: 1px solid #4a6a8a;
+  border-radius: 4px; padding: 5px 10px; font-size: 0.75rem;
+  color: #c8d8e8; display: none; z-index: 10;
+}
+#tooltip strong { color: #ffd770; display: block; margin-bottom: 2px; }
+
+#container { display: inline-block; }
+canvas { display: block; }
+
+.legend {
+  display: flex; flex-wrap: wrap; gap: 10px 18px;
+  margin-top: 12px; font-size: 0.78rem; align-items: center;
+}
+.swatch {
+  width: 14px; height: 14px; display: inline-block; vertical-align: middle;
+  border: 1px solid rgba(255,255,255,0.15); margin-right: 4px;
+}
+.lock-swatch {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem;
+}
+.lock-dot { width: 8px; height: 8px; background: #40d0c0; display: inline-block; border-radius: 1px; }
+.stats { margin-top: 10px; font-size: 0.75rem; color: #8a9aaa; }
+
+/* ── Priority panel ────────────────────────────────────────────── */
+#priority-panel {
+  margin-top: 24px;
+  max-width: 960px;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.panel-box {
+  background: #1e2d3d;
+  border: 1px solid #2a4060;
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+.panel-box h3 {
+  font-size: 0.75rem; color: #e8d8a0; letter-spacing: 0.8px;
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.panel-hint { font-size: 0.74rem; color: #506070; margin-bottom: 14px; }
+
+/* sliders */
+.slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.slider-row:last-child { margin-bottom: 0; }
+.slider-label { font-size: 0.8rem; color: #9ab0c0; flex: 1; }
+.slider-val { width: 16px; text-align: right; font-size: 0.82rem; color: #e8d8a0; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
+
+/* fixed buildings */
+.fixed-summary { font-size: 0.8rem; color: #8a9aaa; margin-bottom: 6px; }
+.fixed-hint { font-size: 0.74rem; color: #506070; margin-bottom: 10px; }
+#fixed-chips { display: flex; flex-wrap: wrap; gap: 5px; max-height: 130px; overflow-y: auto; }
+.chip {
+  border-radius: 4px; padding: 3px 8px; font-size: 0.73rem;
+  cursor: pointer; user-select: none; transition: opacity 0.1s;
+  white-space: nowrap;
+}
+.chip:hover { opacity: 0.75; }
+.chip.gb   { background: #1a3050; border: 1px solid #70b8ff; color: #b0d8ff; }
+.chip.main { background: #2a2000; border: 1px solid #ffc830; color: #ffe090; }
+.chip.user { background: #0a2828; border: 1px solid #40d0c0; color: #80f0e0; }
+
+/* panel footer */
+.panel-footer { display: flex; align-items: center; gap: 12px; }
+#redesign-btn {
+  background: #1a3020; color: #70a860; border: 1px solid #3a6040;
+  border-radius: 8px; padding: 11px 24px; font-size: 0.9rem;
+  font-weight: 600; cursor: not-allowed; opacity: 0.55;
+}
+#reset-btn {
+  background: transparent; color: #6a7a8a; border: 1px solid #3a4a5a;
+  border-radius: 6px; padding: 8px 14px; font-size: 0.78rem;
+  cursor: pointer;
+}
+#reset-btn:hover { color: #8a9aaa; border-color: #4a6a7a; }
+.next-hint { font-size: 0.73rem; color: #3a4a5a; }
+</style>
+</head>
+<body>
+
+<!-- ── Import Screen ──────────────────────────────────────────────────── -->
+<div id="import-screen">
+  <div class="import-card">
+    <h1>FoE City Planner</h1>
+    <p class="tagline">Visualize and optimize your Forge of Empires city layout</p>
+
+    <div class="steps">
+      <div class="step"><span class="n">1.</span> Open Forge of Empires in Chrome with the <strong>FoE Helper</strong> extension installed</div>
+      <div class="step"><span class="n">2.</span> In FoE Helper, open <strong>Town Overview</strong> &rarr; click <strong>Copy City Data</strong></div>
+      <div class="step"><span class="n">3.</span> Return here and click the button below &mdash; allow clipboard access when prompted</div>
+    </div>
+
+    <button id="paste-btn" class="primary-btn">&#128203; Paste City Data from Clipboard</button>
+
+    <div class="divider">&mdash; or &mdash;</div>
+
+    <label class="file-label">
+      Load from saved .json file
+      <input type="file" id="file-input" accept=".json" style="display:none">
+    </label>
+
+    <div id="error-msg"></div>
+    <div id="loading-msg">&#9203; Parsing city data&hellip;</div>
+    <p class="clipboard-note">
+      Clipboard access requires a one-time browser permission prompt.<br>
+      If the button doesn&rsquo;t work, use the file option above.
+    </p>
+  </div>
+</div>
+
+<!-- ── Viewer Screen ──────────────────────────────────────────────────── -->
+<div id="viewer-screen">
+  <div class="toolbar">
+    <h1>FoE City Planner</h1>
+    <button class="back-btn" id="back-btn">&#8617; Load New City</button>
+  </div>
+  <p class="subtitle" id="city-subtitle"></p>
+  <div id="tooltip"></div>
+  <div id="container"><canvas id="grid"></canvas></div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:#b89a5e;"></span>Unlocked</span>
+    <span><span class="swatch" style="background:#1e3248;"></span>Locked</span>
+    <span><span class="swatch" style="background:#4a5560;"></span>Road (1&times;1)</span>
+    <span><span class="swatch" style="background:#5a6a40;"></span>Road (2&times;2)</span>
+    <span><span class="swatch" style="background:#ffc830;"></span>Town Hall</span>
+    <span><span class="swatch" style="background:#28a882;"></span>Generic / Special</span>
+    <span><span class="swatch" style="background:#a8c820;"></span>Tower / Flame</span>
+    <span><span class="swatch" style="background:#e08820;"></span>Production</span>
+    <span><span class="swatch" style="background:#e03838;"></span>Military</span>
+    <span><span class="swatch" style="background:#40b840;"></span>Residential</span>
+    <span><span class="swatch" style="background:#d040a8;"></span>Decoration</span>
+    <span><span class="swatch" style="background:#9040d0;"></span>Hub (main)</span>
+    <span><span class="swatch" style="background:#b060e8;"></span>Hub (part)</span>
+    <span><span class="swatch" style="background:#28a8d8;"></span>Outpost / Ship</span>
+    <span><span class="swatch" style="background:#e04820;"></span>Friends Tavern</span>
+    <span><span class="swatch" style="background:#2e5fa3;border:2px solid #70b8ff;"></span>Great Building</span>
+    <span class="lock-swatch"><span class="lock-dot"></span>Fixed (won&rsquo;t move)</span>
+  </div>
+  <div class="stats" id="stats"></div>
+
+  <!-- ── Priority Panel ──────────────────────────────────────── -->
+  <div id="priority-panel">
+    <div class="panel-grid">
+
+      <!-- Goals -->
+      <div class="panel-box">
+        <h3>Optimization Goals</h3>
+        <p class="panel-hint">Weight each objective for the redesign</p>
+
+        <div class="slider-row">
+          <span class="slider-label">Minimize road tiles</span>
+          <input type="range" id="sl-roads" min="0" max="10" value="7">
+          <span class="slider-val" id="sv-roads">7</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Group identical buildings together</span>
+          <input type="range" id="sl-identical" min="0" max="10" value="7">
+          <span class="slider-val" id="sv-identical">7</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Group by category (Residential, Military&hellip;)</span>
+          <input type="range" id="sl-category" min="0" max="10" value="5">
+          <span class="slider-val" id="sv-category">5</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Maximize contiguous free space</span>
+          <input type="range" id="sl-space" min="0" max="10" value="3">
+          <span class="slider-val" id="sv-space">3</span>
+        </div>
+      </div>
+
+      <!-- Fixed buildings -->
+      <div class="panel-box">
+        <h3>Fixed Buildings</h3>
+        <p class="fixed-summary" id="fixed-summary"></p>
+        <p class="fixed-hint">Click any building on the map to lock or unlock it.</p>
+        <div id="fixed-chips"></div>
+      </div>
+
+    </div>
+
+    <div class="panel-footer">
+      <button id="redesign-btn" disabled title="Optimizer coming in the next phase">
+        Plan Redesign &rarr;
+      </button>
+      <button id="reset-btn">Reset locks to default</button>
+      <span class="next-hint">Optimizer coming in the next phase</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Type maps ─────────────────────────────────────────────────────────────
+const TYPE_COLORS = {
+  main_building:    '#ffc830',
+  generic_building: '#28a882',
+  military:         '#e03838',
+  residential:      '#40b840',
+  hub_main:         '#9040d0',
+  hub_part:         '#b060e8',
+  production:       '#e08820',
+  outpost_ship:     '#28a8d8',
+  decoration:       '#d040a8',
+  tower:            '#a8c820',
+  friends_tavern:   '#e04820',
+  greatbuilding:    '#2e5fa3',
+};
+
+const TYPE_LABELS = {
+  main_building:    'Town Hall',
+  generic_building: 'Generic / Special',
+  military:         'Military',
+  residential:      'Residential',
+  hub_main:         'Guild Hub (main)',
+  hub_part:         'Guild Hub (part)',
+  production:       'Production',
+  outpost_ship:     'Outpost / Ship',
+  decoration:       'Decoration',
+  tower:            'Tower / Flame',
+  friends_tavern:   'Friends Tavern',
+  greatbuilding:    'Great Building',
+};
+
+const PAD    = 4;
+const CELL   = 13;
+const AXIS_W = 32;
+const AXIS_H = 22;
+
+// ── App state ─────────────────────────────────────────────────────────────
+let cityState = null; // { roads, buildings, greatBuildings, unlockedAreas, playerId, fixedSet }
+
+function buildingKey(b) { return `${b.x},${b.y}`; }
+
+function defaultFixedSet(buildings) {
+  return new Set(
+    buildings
+      .filter(b => b.type === 'main_building' || b.type === 'greatbuilding')
+      .map(buildingKey)
+  );
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────
+const importScreen = document.getElementById('import-screen');
+const viewerScreen = document.getElementById('viewer-screen');
+const errorDiv     = document.getElementById('error-msg');
+const loadingDiv   = document.getElementById('loading-msg');
+
+function showScreen(name) {
+  importScreen.style.display = name === 'import' ? 'flex'  : 'none';
+  viewerScreen.style.display = name === 'viewer' ? 'block' : 'none';
+}
+function showError(msg) {
+  errorDiv.textContent   = msg || '';
+  errorDiv.style.display = msg ? 'block' : 'none';
+}
+function showLoading(on) { loadingDiv.style.display = on ? 'block' : 'none'; }
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── JSON parser ───────────────────────────────────────────────────────────
+function getName(entity, fallback) {
+  const n = entity.name;
+  if (!n) return fallback;
+  if (typeof n === 'string') return n;
+  return n.en_US || n.en || Object.values(n)[0] || fallback;
+}
+
+function parseCity(jsonText) {
+  let data;
+  try { data = JSON.parse(jsonText); }
+  catch (e) { throw new Error('Could not parse JSON. Make sure you copied with FoE Helper.'); }
+
+  const { CityMapData, CityEntities, UnlockedAreas } = data;
+  if (!CityMapData || !CityEntities || !UnlockedAreas) {
+    throw new Error('Not a valid FoE city file. Expected CityMapData, CityEntities, and UnlockedAreas keys.');
+  }
+
+  const roads = [], buildings = [], greatBuildings = [];
+
+  for (const placed of Object.values(CityMapData)) {
+    if (placed.type === 'off_grid') continue;
+
+    const entity = CityEntities[placed.cityentity_id];
+    if (!entity) continue;
+
+    let w = entity.width  || 0;
+    let l = entity.length || 0;
+
+    // W_MultiAge_ / W_AllAge_ event buildings store footprint per era in components
+    if ((!w || !l) && entity.components) {
+      for (const comp of Object.values(entity.components)) {
+        const sz = comp?.placement?.size;
+        if (sz?.x && sz?.y) { w = sz.x; l = sz.y; break; }
+      }
+    }
+    if (!w || !l) continue;
+
+    const x    = placed.x ?? 0;
+    const y    = placed.y ?? 0;
+    const name = getName(entity, placed.cityentity_id);
+    const type = placed.type;
+
+    if (type === 'street') { roads.push({ x, y, w, l }); continue; }
+
+    const road = ((entity.requirements?.street_connection_level) || 0) > 0;
+    buildings.push({ type, name, x, y, w, l, road });
+
+    if (type === 'greatbuilding') {
+      greatBuildings.push({ name, x, y, w, l, level: placed.level || 0 });
+    }
+  }
+
+  const firstPlaced = Object.values(CityMapData)[0];
+  const playerId    = firstPlaced?.player_id ?? 'Unknown';
+
+  return { roads, buildings, greatBuildings, unlockedAreas: UnlockedAreas, playerId };
+}
+
+// ── Load entry point ──────────────────────────────────────────────────────
+function loadFromText(text) {
+  showError(null);
+  showLoading(true);
+  setTimeout(() => {
+    try {
+      const parsed = parseCity(text.trim());
+      cityState = { ...parsed, fixedSet: defaultFixedSet(parsed.buildings) };
+      drawCanvas();
+      updatePanel();
+      showScreen('viewer');
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      showLoading(false);
+    }
+  }, 30);
+}
+
+// ── Event handlers ────────────────────────────────────────────────────────
+document.getElementById('paste-btn').addEventListener('click', async () => {
+  if (!navigator.clipboard?.readText) {
+    showError('Clipboard API unavailable — this page needs HTTPS or localhost. Use "Load from file" instead.');
+    return;
+  }
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text?.trim()) { showError('Clipboard is empty — run FoE Helper and copy first.'); return; }
+    loadFromText(text);
+  } catch (e) {
+    if (e.name === 'NotAllowedError') {
+      showError('Clipboard access was denied. Click "Allow" when prompted, or use "Load from file".');
+    } else {
+      showError('Could not read clipboard: ' + e.message);
+    }
+  }
+});
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload  = ev => loadFromText(ev.target.result);
+  reader.onerror = ()  => showError('Could not read file.');
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+document.getElementById('back-btn').addEventListener('click', () => showScreen('import'));
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  if (!cityState) return;
+  cityState.fixedSet = defaultFixedSet(cityState.buildings);
+  drawCanvas();
+  updatePanel();
+});
+
+// Slider value display
+['roads', 'identical', 'category', 'space'].forEach(id => {
+  const slider = document.getElementById(`sl-${id}`);
+  const val    = document.getElementById(`sv-${id}`);
+  slider.addEventListener('input', () => { val.textContent = slider.value; });
+});
+
+// ── Canvas renderer ───────────────────────────────────────────────────────
+function drawCanvas() {
+  const { roads, buildings, greatBuildings, unlockedAreas, playerId, fixedSet } = cityState;
+
+  // Grid extent
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const a of unlockedAreas) {
+    const x = a.x ?? 0, y = a.y ?? 0;
+    minX = Math.min(minX, x);       minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + (a.width  || 0));
+    maxY = Math.max(maxY, y + (a.length || 0));
+  }
+  const gridX0 = Math.max(0, minX - PAD), gridY0 = Math.max(0, minY - PAD);
+  const gridX1 = maxX + PAD,              gridY1 = maxY + PAD;
+  const cols   = gridX1 - gridX0,         rows   = gridY1 - gridY0;
+
+  // Unlocked cell bitmap
+  const unlocked = new Uint8Array(cols * rows);
+  for (const a of unlockedAreas) {
+    const x = a.x ?? 0, y = a.y ?? 0;
+    for (let dy = 0; dy < (a.length || 0); dy++)
+      for (let dx = 0; dx < (a.width || 0); dx++) {
+        const cx = x + dx - gridX0, cy = y + dy - gridY0;
+        if (cx >= 0 && cy >= 0 && cx < cols && cy < rows) unlocked[cy * cols + cx] = 1;
+      }
+  }
+
+  const canvas = document.getElementById('grid');
+  canvas.width  = AXIS_W + cols * CELL + 1;
+  canvas.height = AXIS_H + rows * CELL + 1;
+  const ctx = canvas.getContext('2d');
+
+  const C = {
+    unlocked: '#b89a5e', locked: '#1e3248',
+    gridFine: 'rgba(255,255,255,0.07)', gridChunk: 'rgba(100,160,220,0.25)',
+    axisBg: '#141e2a', axisTxt: '#8a9ab0',
+    road1: '#4a5560', road2: '#5a6a40', roadMark: 'rgba(255,255,255,0.18)',
+    gbFill: '#2e5fa3', gbBorder: '#70b8ff', gbText: '#d8eeff',
+    fixedDot: '#40d0c0',
+  };
+
+  // Background
+  for (let row = 0; row < rows; row++)
+    for (let col = 0; col < cols; col++) {
+      ctx.fillStyle = unlocked[row * cols + col] ? C.unlocked : C.locked;
+      ctx.fillRect(AXIS_W + col * CELL, AXIS_H + row * CELL, CELL, CELL);
+    }
+
+  // Grid lines — fine
+  ctx.strokeStyle = C.gridFine; ctx.lineWidth = 0.5;
+  for (let col = 0; col <= cols; col++) {
+    const px = AXIS_W + col * CELL + 0.5;
+    ctx.beginPath(); ctx.moveTo(px, AXIS_H); ctx.lineTo(px, AXIS_H + rows * CELL); ctx.stroke();
+  }
+  for (let row = 0; row <= rows; row++) {
+    const py = AXIS_H + row * CELL + 0.5;
+    ctx.beginPath(); ctx.moveTo(AXIS_W, py); ctx.lineTo(AXIS_W + cols * CELL, py); ctx.stroke();
+  }
+
+  // Grid lines — chunk
+  ctx.strokeStyle = C.gridChunk; ctx.lineWidth = 1;
+  for (let col = 0; col <= cols; col++) {
+    if ((col + gridX0) % 4 !== 0) continue;
+    const px = AXIS_W + col * CELL + 0.5;
+    ctx.beginPath(); ctx.moveTo(px, AXIS_H); ctx.lineTo(px, AXIS_H + rows * CELL); ctx.stroke();
+  }
+  for (let row = 0; row <= rows; row++) {
+    if ((row + gridY0) % 4 !== 0) continue;
+    const py = AXIS_H + row * CELL + 0.5;
+    ctx.beginPath(); ctx.moveTo(AXIS_W, py); ctx.lineTo(AXIS_W + cols * CELL, py); ctx.stroke();
+  }
+
+  // Axis labels
+  ctx.fillStyle = C.axisBg;
+  ctx.fillRect(0, 0, canvas.width, AXIS_H);
+  ctx.fillRect(0, 0, AXIS_W, canvas.height);
+  ctx.fillStyle = C.axisTxt; ctx.font = '9px monospace'; ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  for (let col = 0; col <= cols; col++) {
+    const gx = col + gridX0; if (gx % 8 !== 0) continue;
+    ctx.fillText(gx, AXIS_W + col * CELL, AXIS_H / 2);
+  }
+  ctx.textAlign = 'right';
+  for (let row = 0; row <= rows; row++) {
+    const gy = row + gridY0; if (gy % 8 !== 0) continue;
+    ctx.fillText(gy, AXIS_W - 3, AXIS_H + row * CELL + CELL / 2);
+  }
+
+  // Roads
+  for (const r of roads) {
+    const px = AXIS_W + (r.x - gridX0) * CELL, py = AXIS_H + (r.y - gridY0) * CELL;
+    const pw = r.w * CELL, ph = r.l * CELL;
+    ctx.fillStyle = r.w === 1 ? C.road1 : C.road2;
+    ctx.fillRect(px, py, pw, ph);
+    if (r.w > 1) {
+      ctx.strokeStyle = C.roadMark; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      const cx = px + pw / 2 + 0.5;
+      ctx.beginPath(); ctx.moveTo(cx, py + 2); ctx.lineTo(cx, py + ph - 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Buildings (base layer, includes GBs at their color)
+  for (const b of buildings) {
+    const px = AXIS_W + (b.x - gridX0) * CELL, py = AXIS_H + (b.y - gridY0) * CELL;
+    const pw = b.w * CELL, ph = b.l * CELL;
+    if (px + pw <= AXIS_W || py + ph <= AXIS_H ||
+        px >= AXIS_W + cols * CELL || py >= AXIS_H + rows * CELL) continue;
+
+    ctx.fillStyle = TYPE_COLORS[b.type] || '#888';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+
+    if (b.road) {
+      ctx.fillStyle = '#ff8800';
+      ctx.beginPath(); ctx.arc(px + pw - 3, py + 3, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+    if (b.w >= 3 && b.l >= 3) drawLabel(ctx, b.name, px, py, pw, ph, 8, 'rgba(0,0,0,0.75)');
+  }
+
+  // Great Buildings (overdraw with border + level)
+  for (const gb of greatBuildings) {
+    const px = AXIS_W + (gb.x - gridX0) * CELL, py = AXIS_H + (gb.y - gridY0) * CELL;
+    const pw = gb.w * CELL, ph = gb.l * CELL;
+    ctx.fillStyle = C.gbFill; ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = C.gbBorder; ctx.lineWidth = 2;
+    ctx.strokeRect(px + 1, py + 1, pw - 2, ph - 2);
+    const fontSize = (pw >= 6 * CELL && ph >= 6 * CELL) ? 9 : 8;
+    drawLabel(ctx, `${gb.name} Lv${gb.level}`, px, py, pw, ph, fontSize, C.gbText);
+  }
+
+  // Lock indicators — teal square in top-left of every fixed building
+  for (const b of buildings) {
+    if (!fixedSet.has(buildingKey(b))) continue;
+    const px = AXIS_W + (b.x - gridX0) * CELL;
+    const py = AXIS_H + (b.y - gridY0) * CELL;
+    ctx.fillStyle = C.fixedDot;
+    ctx.fillRect(px + 1, py + 1, 6, 6);
+  }
+
+  // Stats
+  const totalUnlocked = unlocked.reduce((s, v) => s + v, 0);
+  const roadReq  = buildings.filter(b => b.road).length;
+  const roadFree = buildings.filter(b => !b.road && b.type !== 'greatbuilding').length;
+  document.getElementById('stats').textContent =
+    `Grid: x ${gridX0}–${gridX1}, y ${gridY0}–${gridY1}  |  ` +
+    `Unlocked cells: ${totalUnlocked}  |  ` +
+    `Great Buildings: ${greatBuildings.length}  |  ` +
+    `Road-required: ${roadReq}  |  Road-free: ${roadFree}  |  ` +
+    `Road segments: ${roads.length}`;
+
+  document.getElementById('city-subtitle').textContent =
+    `Player ${playerId}  |  ${buildings.length} buildings  |  ` +
+    `${unlockedAreas.length} expansion chunks  |  ` +
+    `Click a building to lock/unlock it  |  Hover for details`;
+
+  // ── Tooltip & click lookups ──
+  const buildingCell = new Map();
+  for (const b of buildings)
+    for (let dy = 0; dy < b.l; dy++)
+      for (let dx = 0; dx < b.w; dx++)
+        buildingCell.set(`${b.x + dx},${b.y + dy}`, b);
+
+  const roadCell = new Map();
+  for (const r of roads) {
+    const lbl = r.w === 1 ? 'Cobblestone (1\xD71)' : 'Car Street (2\xD72)';
+    for (let dy = 0; dy < r.l; dy++)
+      for (let dx = 0; dx < r.w; dx++)
+        roadCell.set(`${r.x + dx},${r.y + dy}`, lbl);
+  }
+
+  // Tooltip
+  const tooltip = document.getElementById('tooltip');
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const col  = Math.floor((e.clientX - rect.left - AXIS_W) / CELL);
+    const row  = Math.floor((e.clientY - rect.top  - AXIS_H) / CELL);
+    if (col < 0 || row < 0 || col >= cols || row >= rows) {
+      tooltip.style.display = 'none';
+      canvas.style.cursor = 'crosshair';
+      return;
+    }
+    const gx = col + gridX0, gy = row + gridY0;
+
+    const bldg = buildingCell.get(`${gx},${gy}`) ||
+                 greatBuildings.find(b => gx >= b.x && gx < b.x + b.w && gy >= b.y && gy < b.y + b.l);
+
+    canvas.style.cursor = bldg ? 'pointer' : 'crosshair';
+
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top  = (e.clientY - 10) + 'px';
+
+    const gb = greatBuildings.find(b =>
+      gx >= b.x && gx < b.x + b.w && gy >= b.y && gy < b.y + b.l
+    );
+    if (gb) {
+      const locked = fixedSet.has(buildingKey(gb));
+      tooltip.innerHTML =
+        `<strong>&#9733; ${esc(gb.name)}</strong>` +
+        `Level ${gb.level} &nbsp;|&nbsp; ${gb.w}\xD7${gb.l} &nbsp;|&nbsp; (${gb.x}, ${gb.y})<br>` +
+        (locked
+          ? '<span style="color:#40d0c0">&#9632; Fixed &mdash; click to make movable</span>'
+          : '<span style="color:#ff9940">&#8597; Movable &mdash; click to fix in place</span>');
+      return;
+    }
+
+    const b = buildingCell.get(`${gx},${gy}`);
+    if (b) {
+      const lbl    = TYPE_LABELS[b.type] || b.type;
+      const locked = fixedSet.has(buildingKey(b));
+      const roadTag = b.road
+        ? ' &nbsp;<span style="color:#ff8800">&#128739; Road needed</span>'
+        : ' &nbsp;<span style="color:#88cc88">&#10004; No road</span>';
+      tooltip.innerHTML =
+        `<strong>${esc(b.name)}</strong>` +
+        `${esc(lbl)} &nbsp;|&nbsp; ${b.w}\xD7${b.l} &nbsp;|&nbsp; (${b.x}, ${b.y})${roadTag}<br>` +
+        (locked
+          ? '<span style="color:#40d0c0">&#9632; Fixed &mdash; click to make movable</span>'
+          : '<span style="color:#ff9940">&#8597; Movable &mdash; click to fix in place</span>');
+      return;
+    }
+
+    const road = roadCell.get(`${gx},${gy}`);
+    if (road) {
+      tooltip.innerHTML = `<strong>&#9644; Road</strong>${esc(road)} &nbsp;|&nbsp; (${gx}, ${gy})`;
+      return;
+    }
+
+    tooltip.textContent = `(${gx}, ${gy})  —  ${unlocked[row * cols + col] ? 'Unlocked' : 'Locked'}`;
+  };
+  canvas.onmouseleave = () => { tooltip.style.display = 'none'; canvas.style.cursor = 'crosshair'; };
+
+  // Click to toggle fixed
+  canvas.onclick = e => {
+    const rect = canvas.getBoundingClientRect();
+    const col  = Math.floor((e.clientX - rect.left - AXIS_W) / CELL);
+    const row  = Math.floor((e.clientY - rect.top  - AXIS_H) / CELL);
+    if (col < 0 || row < 0 || col >= cols || row >= rows) return;
+    const gx = col + gridX0, gy = row + gridY0;
+
+    // Check GBs first (they overdraw), then regular buildings
+    const gb = greatBuildings.find(b =>
+      gx >= b.x && gx < b.x + b.w && gy >= b.y && gy < b.y + b.l
+    );
+    const b = gb || buildingCell.get(`${gx},${gy}`);
+    if (!b) return;
+
+    const key = buildingKey(b);
+    if (fixedSet.has(key)) fixedSet.delete(key); else fixedSet.add(key);
+
+    drawCanvas();
+    updatePanel();
+  };
+}
+
+// ── Priority panel updater ────────────────────────────────────────────────
+function updatePanel() {
+  const { buildings, greatBuildings, fixedSet } = cityState;
+
+  const fixedCount   = fixedSet.size;
+  const movableCount = buildings.length - fixedCount;
+
+  document.getElementById('fixed-summary').textContent =
+    `${fixedCount} locked  •  ${movableCount} will be repositioned`;
+
+  // Build chips
+  const chipsEl = document.getElementById('fixed-chips');
+  chipsEl.innerHTML = '';
+
+  // Show all fixed buildings as chips; clicking a chip unfixes it
+  for (const b of buildings) {
+    const key = buildingKey(b);
+    if (!fixedSet.has(key)) continue;
+
+    const chip = document.createElement('span');
+    chip.className = 'chip ' +
+      (b.type === 'main_building' ? 'main' :
+       b.type === 'greatbuilding' ? 'gb'   : 'user');
+
+    const label = b.type === 'greatbuilding'
+      ? `${b.name} Lv${greatBuildings.find(g => g.x === b.x && g.y === b.y)?.level ?? ''}`
+      : b.name;
+
+    chip.textContent = label;
+    chip.title = 'Click to unlock';
+    chip.addEventListener('click', () => {
+      fixedSet.delete(key);
+      drawCanvas();
+      updatePanel();
+    });
+    chipsEl.appendChild(chip);
+  }
+}
+
+// ── Word-wrap label ───────────────────────────────────────────────────────
+function drawLabel(ctx, text, px, py, pw, ph, fontSize, color) {
+  const padX = 3, padY = 3;
+  const maxW = pw - padX * 2, maxH = ph - padY * 2;
+  if (maxW < 10 || maxH < 10) return;
+
+  ctx.fillStyle = color; ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+
+  const lineH = fontSize + 2;
+  const words = text.split(' ');
+  const lines = []; let line = '';
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width <= maxW) { line = test; }
+    else { if (line) lines.push(line); line = word; }
+  }
+  if (line) lines.push(line);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(px + padX, py + padY, maxW, maxH); ctx.clip();
+  const startY = py + padY + Math.max(0, (maxH - lines.length * lineH) / 2);
+  lines.forEach((l, i) => ctx.fillText(l, px + padX, startY + i * lineH));
+  ctx.restore();
+}
+</script>
+</body>
+</html>
