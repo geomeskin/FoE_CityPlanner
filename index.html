@@ -137,6 +137,19 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
   border-radius: 8px; padding: 11px 24px; font-size: 0.9rem;
   font-weight: 600; cursor: not-allowed; opacity: 0.55;
 }
+#redesign-btn:not(:disabled) {
+  cursor: pointer;
+  opacity: 1;
+  background: #2a5030;
+  color: #a0e880;
+  border-color: #5a8050;
+  transition: all 0.15s;
+}
+#redesign-btn:not(:disabled):hover {
+  background: #3a6a40;
+  color: #c0f8a0;
+  border-color: #7aa060;
+}
 #reset-btn {
   background: transparent; color: #6a7a8a; border: 1px solid #3a4a5a;
   border-radius: 6px; padding: 8px 14px; font-size: 0.78rem;
@@ -144,6 +157,162 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
 }
 #reset-btn:hover { color: #8a9aaa; border-color: #4a6a7a; }
 .next-hint { font-size: 0.73rem; color: #3a4a5a; }
+
+/* ── Metrics Panel (Phase 2) ──────────────────────────────────── */
+#metrics-panel {
+  display: none;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 320px;
+  height: 100vh;
+  background: #1e2d3d;
+  border-left: 1px solid #2a4060;
+  overflow-y: auto;
+  padding: 20px;
+  z-index: 8;
+  font-size: 0.78rem;
+  color: #d0c8b0;
+}
+#metrics-panel h2 {
+  font-size: 0.85rem;
+  color: #e8d8a0;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+}
+#metrics-panel h3 {
+  font-size: 0.75rem;
+  color: #b0c8d0;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2a4060;
+}
+.metric-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px 0;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+.metric-label {
+  color: #9ab0c0;
+  font-weight: 500;
+}
+.metric-values {
+  color: #c8d8b0;
+  text-align: right;
+  font-family: 'Courier New', monospace;
+}
+.metric-values .before {
+  display: block;
+  color: #a8a88a;
+  font-size: 0.73rem;
+}
+.metric-values .after {
+  display: block;
+  color: #b8c88a;
+  font-size: 0.73rem;
+}
+.metric-values .delta {
+  display: block;
+  color: #70c870;
+  font-size: 0.73rem;
+  font-weight: 600;
+}
+.metric-values .delta.negative {
+  color: #d08070;
+}
+
+.movement-summary {
+  background: #141e2a;
+  border: 1px solid #2a4060;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+.movement-summary .moved {
+  color: #70c870;
+  font-weight: 600;
+}
+.movement-summary .unchanged {
+  color: #8a9aaa;
+}
+
+.expand-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: #7a9ab0;
+  cursor: pointer;
+  font-size: 0.76rem;
+  padding: 6px 0;
+  margin: 8px 0;
+  text-align: left;
+  width: 100%;
+}
+.expand-btn:hover {
+  color: #9ab0c8;
+}
+.expand-btn .arrow {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.expand-btn.expanded .arrow {
+  transform: rotate(90deg);
+}
+
+.movement-details {
+  display: none;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(20, 30, 42, 0.6);
+  border-radius: 4px;
+  border: 1px solid #1a3050;
+}
+.movement-details.expanded {
+  display: block;
+}
+
+.building-change {
+  margin-bottom: 10px;
+  padding: 8px;
+  background: #141e2a;
+  border-left: 3px solid #40d0c0;
+  border-radius: 3px;
+  font-size: 0.74rem;
+}
+.building-change-name {
+  color: #e8d8a0;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.building-change-cat {
+  color: #9ab0c0;
+  font-size: 0.72rem;
+  margin-bottom: 4px;
+}
+.building-change-coords {
+  color: #c8d8b0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.73rem;
+  margin-bottom: 2px;
+}
+.building-change-distance {
+  color: #a8c8a8;
+  font-size: 0.72rem;
+}
 </style>
 </head>
 <body>
@@ -209,41 +378,28 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
   </div>
   <div class="stats" id="stats"></div>
 
+  <!-- ── Metrics Panel (Phase 2) ──────────────────────────────── -->
+  <div id="metrics-panel">
+    <h2>Optimization Results</h2>
+    
+    <h3>Metrics Comparison</h3>
+    <div id="metrics-list"></div>
+    
+    <h3>Buildings Moved</h3>
+    <div class="movement-summary">
+      <span class="moved" id="moved-count">—</span> moved
+      <br><span class="unchanged" id="unchanged-count">—</span> unchanged
+    </div>
+    
+    <button class="expand-btn" id="expand-movement-btn">
+      <span class="arrow">&#9656;</span>
+      <span id="expand-text">Show changes</span>
+    </button>
+    <div id="movement-details" class="movement-details"></div>
+  </div>
+
   <!-- ── Priority Panel ──────────────────────────────────────── -->
   <div id="priority-panel">
-    <div class="panel-grid">
-
-      <!-- Goals -->
-      <div class="panel-box">
-        <h3>Optimization Goals</h3>
-        <p class="panel-hint">Weight each objective for the redesign</p>
-
-        <div class="slider-row">
-          <span class="slider-label">Minimize road tiles</span>
-          <input type="range" id="sl-roads" min="0" max="10" value="7">
-          <span class="slider-val" id="sv-roads">7</span>
-        </div>
-        <div class="slider-row">
-          <span class="slider-label">Group identical buildings together</span>
-          <input type="range" id="sl-identical" min="0" max="10" value="7">
-          <span class="slider-val" id="sv-identical">7</span>
-        </div>
-        <div class="slider-row">
-          <span class="slider-label">Group by category (Residential, Military&hellip;)</span>
-          <input type="range" id="sl-category" min="0" max="10" value="5">
-          <span class="slider-val" id="sv-category">5</span>
-        </div>
-        <div class="slider-row">
-          <span class="slider-label">Maximize contiguous free space</span>
-          <input type="range" id="sl-space" min="0" max="10" value="3">
-          <span class="slider-val" id="sv-space">3</span>
-        </div>
-      </div>
-
-      <!-- Fixed buildings -->
-      <div class="panel-box">
-        <h3>Fixed Buildings</h3>
-        <p class="fixed-summary" id="fixed-summary"></p>
         <p class="fixed-hint">Click any building on the map to lock or unlock it.</p>
         <div id="fixed-chips"></div>
       </div>
@@ -402,6 +558,7 @@ function loadFromText(text) {
       drawCanvas();
       updatePanel();
       showScreen('viewer');
+      enableRedesignButton();
     } catch (e) {
       showError(e.message);
     } finally {
@@ -452,7 +609,9 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 ['roads', 'identical', 'category', 'space'].forEach(id => {
   const slider = document.getElementById(`sl-${id}`);
   const val    = document.getElementById(`sv-${id}`);
-  slider.addEventListener('input', () => { val.textContent = slider.value; });
+  if (slider && val) {
+    slider.addEventListener('input', () => { val.textContent = slider.value; });
+  }
 });
 
 // ── Canvas renderer ───────────────────────────────────────────────────────
@@ -776,6 +935,127 @@ function drawLabel(ctx, text, px, py, pw, ph, fontSize, color) {
   lines.forEach((l, i) => ctx.fillText(l, px + padX, startY + i * lineH));
   ctx.restore();
 }
+
+// ── Phase 2: Metrics Panel Integration ────────────────────────────────────
+// Enable redesign button and connect it to metrics display
+
+function enableRedesignButton() {
+  const redesignBtn = document.getElementById('redesign-btn');
+  if (!redesignBtn) return;
+  
+  redesignBtn.disabled = false;
+  redesignBtn.style.opacity = '1';
+  redesignBtn.style.cursor = 'pointer';
+  redesignBtn.title = 'Click to run the optimization algorithm';
+  
+  // Remove the old disabled title hint
+  const nextHint = document.querySelector('.next-hint');
+  if (nextHint) nextHint.style.display = 'none';
+  
+  redesignBtn.addEventListener('click', onRedesignButtonClick);
+}
+
+function onRedesignButtonClick() {
+  if (!cityState) return;
+  
+  // Get current weights from sliders
+  const weights = {
+    roads: parseFloat(document.getElementById('sl-roads').value) || 7,
+    identical: parseFloat(document.getElementById('sl-identical').value) || 7,
+    category: parseFloat(document.getElementById('sl-category').value) || 5,
+    space: parseFloat(document.getElementById('sl-space').value) || 3,
+  };
+  
+  // TODO: Call actual optimization algorithm here
+  // For now, we'll create a mock redesign to demonstrate the metrics panel
+  
+  const originalBuildings = JSON.parse(JSON.stringify(cityState.buildings));
+  const redesignedBuildings = createMockRedesign(originalBuildings, weights);
+  const metrics = calculateMockMetrics(originalBuildings, redesignedBuildings, weights);
+  
+  // Display the metrics
+  initializeMetricsPanel(originalBuildings, redesignedBuildings, metrics);
+}
+
+/**
+ * Mock redesign for demonstration (shuffles some buildings)
+ */
+function createMockRedesign(originalBuildings, weights) {
+  const redesigned = JSON.parse(JSON.stringify(originalBuildings));
+  
+  // Create some mock displacement based on weights
+  const displacementFactor = (weights.roads + weights.identical + weights.category) / 10;
+  
+  // Move ~30-50% of buildings based on weights
+  const moveCount = Math.floor(redesigned.length * Math.min(0.5, displacementFactor / 10));
+  const indices = Array.from({ length: redesigned.length }, (_, i) => i)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, moveCount);
+  
+  for (const idx of indices) {
+    const b = redesigned[idx];
+    if (b.type === 'main_building' || b.type === 'greatbuilding') continue; // Don't move fixed
+    
+    // Random displacement within reasonable bounds
+    b.x += Math.floor((Math.random() - 0.5) * 8);
+    b.y += Math.floor((Math.random() - 0.5) * 8);
+    b.x = Math.max(0, b.x);
+    b.y = Math.max(0, b.y);
+  }
+  
+  return redesigned;
+}
+
+/**
+ * Calculate mock metrics for demonstration
+ */
+function calculateMockMetrics(originalBuildings, redesignedBuildings, weights) {
+  const roadWeight = weights.roads / 10;
+  const identicalWeight = weights.identical / 10;
+  const categoryWeight = weights.category / 10;
+  const spaceWeight = weights.space / 10;
+  
+  // Count road-required buildings
+  const roadsNeeded = originalBuildings.filter(b => b.road).length;
+  const estimatedRoadReduction = Math.floor(roadsNeeded * roadWeight * 0.15); // Estimate 15% reduction per weight
+  
+  return {
+    roads: {
+      label: 'Road Segments',
+      before: roadsNeeded,
+      after: Math.max(0, roadsNeeded - estimatedRoadReduction),
+      goodIfPositive: false,
+    },
+    clustering: {
+      label: 'Clustering Efficiency',
+      before: 0.65 + (identicalWeight * 0.2),
+      after: 0.75 + (identicalWeight * 0.25),
+      isPercentage: true,
+      goodIfPositive: true,
+    },
+    categoryGrouping: {
+      label: 'Category Grouping Score',
+      before: 0.58,
+      after: 0.68 + (categoryWeight * 0.15),
+      isPercentage: true,
+      goodIfPositive: true,
+    },
+    freeSpace: {
+      label: 'Contiguous Free Space',
+      before: 42,
+      after: 48 + Math.floor(spaceWeight * 10),
+      goodIfPositive: true,
+    },
+  };
+}
+
+// Enable the redesign button when a city is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  // Note: enableRedesignButton is called after city is loaded, not on page load
+});
 </script>
+
+<!-- Load the redesign output module -->
+<script src="redesign-output.js"></script>
 </body>
 </html>
