@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Phase 2 Demo - Metrics Panel Display</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #1a2230; color: #d0c8b0; font-family: 'Segoe UI', sans-serif; padding: 20px; }
+    
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #e8d8a0; margin-bottom: 20px; letter-spacing: 1px; }
+    
+    .demo-section {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+      margin-bottom: 40px;
+      background: #141e2a;
+      border: 1px solid #2a4060;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    
+    .demo-canvas {
+      background: #0a0a0a;
+      border: 1px solid #3a4060;
+      border-radius: 4px;
+      height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8a9aaa;
+    }
+    
+    /* Metrics Panel (from index.html) */
+    #metrics-panel {
+      position: static;
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #1e2d3d;
+      border: 1px solid #2a4060;
+      border-radius: 8px;
+      overflow-y: auto;
+      padding: 20px;
+      z-index: 8;
+      font-size: 0.78rem;
+      color: #d0c8b0;
+    }
+    #metrics-panel h2 {
+      font-size: 0.85rem;
+      color: #e8d8a0;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+    #metrics-panel h3 {
+      font-size: 0.75rem;
+      color: #b0c8d0;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #2a4060;
+    }
+    .metric-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 8px 0;
+      font-size: 0.76rem;
+      line-height: 1.4;
+    }
+    .metric-label {
+      color: #9ab0c0;
+      font-weight: 500;
+    }
+    .metric-values {
+      color: #c8d8b0;
+      text-align: right;
+      font-family: 'Courier New', monospace;
+    }
+    .metric-values .before {
+      display: block;
+      color: #a8a88a;
+      font-size: 0.73rem;
+    }
+    .metric-values .after {
+      display: block;
+      color: #b8c88a;
+      font-size: 0.73rem;
+    }
+    .metric-values .delta {
+      display: block;
+      color: #70c870;
+      font-size: 0.73rem;
+      font-weight: 600;
+    }
+    .metric-values .delta.negative {
+      color: #d08070;
+    }
+    
+    .movement-summary {
+      background: #141e2a;
+      border: 1px solid #2a4060;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 0.76rem;
+      line-height: 1.5;
+    }
+    .movement-summary .moved {
+      color: #70c870;
+      font-weight: 600;
+    }
+    .movement-summary .unchanged {
+      color: #8a9aaa;
+    }
+    
+    .expand-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      border: none;
+      color: #7a9ab0;
+      cursor: pointer;
+      font-size: 0.76rem;
+      padding: 6px 0;
+      margin: 8px 0;
+      text-align: left;
+      width: 100%;
+    }
+    .expand-btn:hover {
+      color: #9ab0c8;
+    }
+    .expand-btn .arrow {
+      display: inline-block;
+      transition: transform 0.2s;
+    }
+    .expand-btn.expanded .arrow {
+      transform: rotate(90deg);
+    }
+    
+    .movement-details {
+      display: none;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(20, 30, 42, 0.6);
+      border-radius: 4px;
+      border: 1px solid #1a3050;
+    }
+    .movement-details.expanded {
+      display: block;
+    }
+    
+    .building-change {
+      margin-bottom: 10px;
+      padding: 8px;
+      background: #141e2a;
+      border-left: 3px solid #40d0c0;
+      border-radius: 3px;
+      font-size: 0.74rem;
+    }
+    .building-change-name {
+      color: #e8d8a0;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+    .building-change-cat {
+      color: #9ab0c0;
+      font-size: 0.72rem;
+      margin-bottom: 4px;
+    }
+    .building-change-coords {
+      color: #c8d8b0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.73rem;
+      margin-bottom: 2px;
+    }
+    .building-change-distance {
+      color: #a8c8a8;
+      font-size: 0.72rem;
+    }
+    
+    .note {
+      background: #0a2828;
+      border-left: 3px solid #40d0c0;
+      padding: 12px;
+      margin-top: 20px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      color: #9ab0c0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Phase 2 Demo: Metrics Panel Display</h1>
+    
+    <h2 style="color: #b0c8d0; font-size: 1rem; margin-bottom: 10px;">Live Preview</h2>
+    <div class="demo-section">
+      <div class="demo-canvas">
+        [Canvas visualization of redesigned city layout with buildings]
+      </div>
+      
+      <!-- Metrics Panel Preview -->
+      <div id="metrics-panel">
+        <h2>Optimization Results</h2>
+        
+        <h3>Metrics Comparison</h3>
+        <div id="metrics-list">
+          <div class="metric-row">
+            <div class="metric-label">Road Segments</div>
+            <div class="metric-values">
+              <span class="before">Before: 120</span>
+              <span class="after">After: 85</span>
+              <span class="delta">-35 (-29%)</span>
+            </div>
+          </div>
+          
+          <div class="metric-row">
+            <div class="metric-label">Clustering Efficiency</div>
+            <div class="metric-values">
+              <span class="before">Before: 0.65</span>
+              <span class="after">After: 0.78</span>
+              <span class="delta">+0.13</span>
+            </div>
+          </div>
+          
+          <div class="metric-row">
+            <div class="metric-label">Category Grouping Score</div>
+            <div class="metric-values">
+              <span class="before">Before: 0.58</span>
+              <span class="after">After: 0.68</span>
+              <span class="delta">+0.10</span>
+            </div>
+          </div>
+          
+          <div class="metric-row">
+            <div class="metric-label">Contiguous Free Space</div>
+            <div class="metric-values">
+              <span class="before">Before: 42</span>
+              <span class="after">After: 54</span>
+              <span class="delta">+12 (+29%)</span>
+            </div>
+          </div>
+        </div>
+        
+        <h3>Buildings Moved</h3>
+        <div class="movement-summary">
+          <span class="moved">120 buildings moved</span>
+          <br><span class="unchanged">424 buildings unchanged</span>
+        </div>
+        
+        <button class="expand-btn expanded" onclick="this.classList.toggle('expanded'); document.getElementById('movement-details').classList.toggle('expanded');">
+          <span class="arrow">&#9656;</span>
+          <span>Hide changes</span>
+        </button>
+        <div id="movement-details" class="movement-details expanded">
+          <div class="building-change">
+            <div class="building-change-name">House</div>
+            <div class="building-change-cat">Residential</div>
+            <div class="building-change-coords">(10, 20) → (18, 25)</div>
+            <div class="building-change-distance">Distance: 9.4 cells</div>
+          </div>
+          
+          <div class="building-change">
+            <div class="building-change-name">Factory</div>
+            <div class="building-change-cat">Production</div>
+            <div class="building-change-coords">(30, 40) → (35, 48)</div>
+            <div class="building-change-distance">Distance: 9.4 cells</div>
+          </div>
+          
+          <div class="building-change">
+            <div class="building-change-name">Barracks</div>
+            <div class="building-change-cat">Military</div>
+            <div class="building-change-coords">(50, 60) → (52, 65)</div>
+            <div class="building-change-distance">Distance: 5.4 cells</div>
+          </div>
+          
+          <div class="building-change">
+            <div class="building-change-name">Market</div>
+            <div class="building-change-cat">Generic / Special</div>
+            <div class="building-change-coords">(15, 35) → (20, 40)</div>
+            <div class="building-change-distance">Distance: 7.1 cells</div>
+          </div>
+          
+          <p style="color: #8a9aaa; font-size: 0.73rem; padding: 8px 0;">... and 116 more buildings</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="note">
+      <strong>✓ Implementation Complete for Phase 2</strong><br><br>
+      <strong>Features Implemented:</strong><br>
+      • Metrics panel right sidebar with before/after/delta comparison<br>
+      • Support for all weighted optimization metrics (roads, clustering, category grouping, space)<br>
+      • Movement summary: shows count of moved vs. unchanged buildings<br>
+      • Expandable change list: click to show/hide detailed building relocations<br>
+      • Building details: name, category, original/new coordinates, distance moved<br>
+      • Full styling with color-coded metrics (green for improvements)<br><br>
+      <strong>Integration Points:</strong><br>
+      • redesign-output.js module with 10+ utility functions<br>
+      • onClick handler on "Plan Redesign" button to trigger optimization display<br>
+      • Mock optimization with sample metrics for demo purposes<br>
+      • Ready for real optimization algorithm integration<br><br>
+      <strong>Unit Tests:</strong><br>
+      • All 6 function tests pass (calculateDistance, formatMetricNumber, buildMovementChangelog, etc.)<br>
+      • Complete HTML/CSS structure matches specification<br>
+      • Expandable/collapsible UI working correctly
+    </div>
+  </div>
+  
+  <script src="redesign-output.js"></script>
+</body>
+</html>

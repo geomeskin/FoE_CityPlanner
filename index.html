@@ -313,6 +313,275 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
   color: #a8c8a8;
   font-size: 0.72rem;
 }
+
+/* ── Redesign Results Screen (Phase 3) ──────────────────────── */
+#redesign-results-screen {
+  display: none;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #1a2230;
+}
+
+.redesign-header {
+  padding: 16px 20px;
+  background: #1e2d3d;
+  border-bottom: 1px solid #2a4060;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.redesign-header h1 {
+  font-size: 1.2rem;
+  color: #e8d8a0;
+  letter-spacing: 1px;
+  flex: 1;
+}
+
+.layout-tabs {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.tab-button {
+  background: #141e2a;
+  color: #7a9ab0;
+  border: 1px solid #2a4060;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tab-button:hover {
+  background: #1e2d3d;
+  color: #9ab0c8;
+}
+
+.tab-button.active {
+  background: #2e5fa3;
+  color: #e8f4ff;
+  border-color: #5a8fd8;
+}
+
+.redesign-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.redesign-canvas-area {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  overflow: auto;
+}
+
+#redesign-canvas-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+  border: 1px solid #2a4060;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+#redesign-canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+#redesign-canvas.drag-mode {
+  cursor: grab;
+}
+
+#redesign-canvas.dragging {
+  cursor: grabbing;
+}
+
+.target-cell-overlay {
+  position: absolute;
+  pointer-events: none;
+  display: none;
+  z-index: 5;
+}
+
+.target-cell-overlay.visible {
+  display: block;
+}
+
+.redesign-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #1e2d3d;
+  border-top: 1px solid #2a4060;
+  flex-wrap: wrap;
+}
+
+.footer-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.reset-btn {
+  background: #1a3020;
+  color: #70a860;
+  border: 1px solid #3a6040;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.reset-btn:hover {
+  background: #2a5030;
+  color: #a0e880;
+  border-color: #5a8050;
+}
+
+.footer-stats {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #8a9aaa;
+}
+
+/* Modal confirmation dialog */
+.confirmation-dialog {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmation-dialog.visible {
+  display: flex;
+}
+
+.confirmation-box {
+  background: #1e2d3d;
+  border: 1px solid #2a4060;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.confirmation-box h3 {
+  color: #e8d8a0;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+
+.confirmation-box p {
+  color: #9ab0c0;
+  margin-bottom: 20px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.confirmation-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.confirmation-btn {
+  background: #1a3020;
+  color: #70a860;
+  border: 1px solid #3a6040;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.confirmation-btn.cancel {
+  background: #2a2a2a;
+  color: #8a8a8a;
+  border-color: #3a3a3a;
+}
+
+.confirmation-btn:hover {
+  opacity: 0.8;
+}
+
+/* Redesign metrics sidebar */
+#redesign-metrics-panel {
+  background: #1e2d3d;
+  border-left: 1px solid #2a4060;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+}
+
+#redesign-metrics-panel h2 {
+  font-size: 0.85rem;
+  color: #e8d8a0;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #2a4060;
+  padding-bottom: 10px;
+}
+
+#redesign-metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #141e2a;
+  border: 1px solid #2a4060;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  gap: 8px;
+}
+
+.metric-label {
+  color: #9ab0c0;
+  flex: 1;
+  min-width: 0;
+}
+
+.metric-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+.metric-values span {
+  color: #c8d8e8;
+  font-size: 0.72rem;
+}
 </style>
 </head>
 <body>
@@ -412,6 +681,50 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
       </button>
       <button id="reset-btn">Reset locks to default</button>
       <span class="next-hint">Optimizer coming in the next phase</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Redesign Results Screen (Phase 3) ──────────────────────────────── -->
+<div id="redesign-results-screen">
+  <div class="redesign-header">
+    <h1>Fine-Tune Your Layout</h1>
+    <div class="layout-tabs">
+      <button class="tab-button active" data-tab="original">Original Layout</button>
+      <button class="tab-button" data-tab="redesigned">Redesigned Layout</button>
+    </div>
+  </div>
+  
+  <div class="redesign-body">
+    <div class="redesign-canvas-area">
+      <div id="redesign-canvas-container">
+        <canvas id="redesign-canvas"></canvas>
+      </div>
+    </div>
+    
+    <!-- Metrics sidebar -->
+    <div id="redesign-metrics-panel">
+      <h2>Current Metrics</h2>
+      <div id="redesign-metrics-list"></div>
+    </div>
+  </div>
+  
+  <div class="redesign-footer">
+    <div class="footer-buttons">
+      <button class="reset-btn" id="redesign-reset-btn">↻ Reset to Optimization</button>
+    </div>
+    <div class="footer-stats" id="redesign-stats">Redesigned Layout • Drag buildings to adjust</div>
+  </div>
+</div>
+
+<!-- Confirmation dialog -->
+<div class="confirmation-dialog" id="confirmation-dialog">
+  <div class="confirmation-box">
+    <h3>Reset to Optimization?</h3>
+    <p>This will discard all your manual adjustments and restore the optimized layout from the planner.</p>
+    <div class="confirmation-buttons">
+      <button class="confirmation-btn cancel" id="confirm-cancel">Cancel</button>
+      <button class="confirmation-btn" id="confirm-reset">Reset</button>
     </div>
   </div>
 </div>
@@ -1047,6 +1360,573 @@ function calculateMockMetrics(originalBuildings, redesignedBuildings, weights) {
       goodIfPositive: true,
     },
   };
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * PHASE 3: Fine-Tuning Interaction
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+
+// Phase 3 state
+let phase3State = {
+  currentTab: 'original',
+  originalBuildings: [],
+  redesignedBuildings: [],
+  userAdjustments: new Map(), // Key: "x,y", Value: building object
+  currentMetrics: {},
+  draggedBuilding: null,
+  dragStartPos: null,
+};
+
+/**
+ * Show the redesign results screen and initialize Phase 3
+ */
+function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metrics) {
+  // Save state
+  phase3State.originalBuildings = JSON.parse(JSON.stringify(originalBuildings));
+  phase3State.redesignedBuildings = JSON.parse(JSON.stringify(redesignedBuildings));
+  phase3State.currentMetrics = metrics;
+  phase3State.userAdjustments = new Map();
+  phase3State.currentTab = 'original';
+  
+  // Hide viewer, show redesign results
+  document.getElementById('viewer-screen').style.display = 'none';
+  document.getElementById('redesign-results-screen').style.display = 'flex';
+  
+  // Setup tabs
+  setupTabSwitching();
+  
+  // Setup event listeners
+  setupRedesignCanvasListeners();
+  setupResetButton();
+  setupConfirmationDialog();
+  
+  // Initial draw
+  redrawRedesignCanvas();
+  updateRedesignMetrics();
+}
+
+/**
+ * Switch between Original and Redesigned tabs
+ */
+function setupTabSwitching() {
+  const buttons = document.querySelectorAll('.tab-button');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Update active state
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      // Update current tab
+      phase3State.currentTab = btn.dataset.tab;
+      
+      // Redraw canvas
+      redrawRedesignCanvas();
+      
+      // Update footer
+      const stats = document.getElementById('redesign-stats');
+      const resetBtn = document.getElementById('redesign-reset-btn');
+      if (phase3State.currentTab === 'original') {
+        stats.textContent = 'Original Layout • Read-only';
+        resetBtn.disabled = true;
+      } else {
+        stats.textContent = 'Redesigned Layout • Drag buildings to adjust';
+        resetBtn.disabled = false;
+      }
+    });
+  });
+}
+
+/**
+ * Redraw the redesign canvas based on current tab and adjustments
+ */
+function redrawRedesignCanvas() {
+  const canvas = document.getElementById('redesign-canvas');
+  const container = document.getElementById('redesign-canvas-container');
+  const ctx = canvas.getContext('2d');
+  
+  // Get buildings to display
+  let buildings = phase3State.currentTab === 'original'
+    ? phase3State.originalBuildings
+    : phase3State.redesignedBuildings;
+  
+  // Apply user adjustments if on redesigned tab
+  if (phase3State.currentTab === 'redesigned' && phase3State.userAdjustments.size > 0) {
+    buildings = buildings.map(b => {
+      const adj = phase3State.userAdjustments.get(`${b.x},${b.y}`);
+      return adj || b;
+    });
+  }
+  
+  // Calculate canvas size
+  const maxX = Math.max(...buildings.map(b => b.x + b.w), ...phase3State.originalBuildings.map(b => b.x + b.w));
+  const maxY = Math.max(...buildings.map(b => b.y + b.l), ...phase3State.originalBuildings.map(b => b.y + b.l));
+  
+  const canvasW = AXIS_W + maxX * CELL + PAD * 2;
+  const canvasH = AXIS_H + maxY * CELL + PAD * 2;
+  
+  // Set canvas size with scaling
+  const containerW = container.clientWidth - 32; // Padding
+  const containerH = container.clientHeight - 32;
+  const scale = Math.min(containerW / canvasW, containerH / canvasH, 1);
+  
+  canvas.width = canvasW * scale;
+  canvas.height = canvasH * scale;
+  
+  ctx.scale(scale, scale);
+  
+  // Draw grid background
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+  
+  // Draw grid lines
+  ctx.strokeStyle = '#1a3050';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= maxX; i++) {
+    ctx.beginPath();
+    ctx.moveTo(AXIS_W + i * CELL, AXIS_H);
+    ctx.lineTo(AXIS_W + i * CELL, AXIS_H + maxY * CELL);
+    ctx.stroke();
+  }
+  for (let i = 0; i <= maxY; i++) {
+    ctx.beginPath();
+    ctx.moveTo(AXIS_W, AXIS_H + i * CELL);
+    ctx.lineTo(AXIS_W + maxX * CELL, AXIS_H + i * CELL);
+    ctx.stroke();
+  }
+  
+  // Draw buildings
+  buildings.forEach(b => {
+    const x = AXIS_W + b.x * CELL;
+    const y = AXIS_H + b.y * CELL;
+    const w = b.w * CELL;
+    const h = b.l * CELL;
+    
+    // Fill
+    ctx.fillStyle = TYPE_COLORS[b.type] || '#888888';
+    ctx.fillRect(x, y, w, h);
+    
+    // Border
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+  });
+}
+
+/**
+ * Setup canvas mouse event listeners for dragging
+ */
+function setupRedesignCanvasListeners() {
+  const canvas = document.getElementById('redesign-canvas');
+  
+  canvas.addEventListener('mousedown', (e) => {
+    if (phase3State.currentTab === 'original') return; // No dragging on original
+    
+    const building = getBuildingUnderMouse(e);
+    if (!building) return;
+    
+    phase3State.draggedBuilding = building;
+    phase3State.dragStartPos = { x: building.x, y: building.y };
+    canvas.classList.add('dragging');
+  });
+  
+  canvas.addEventListener('mousemove', (e) => {
+    if (!phase3State.draggedBuilding) {
+      // Update cursor based on hover
+      const building = getBuildingUnderMouse(e);
+      if (phase3State.currentTab === 'redesigned' && building) {
+        canvas.style.cursor = 'grab';
+      } else {
+        canvas.style.cursor = 'crosshair';
+      }
+      return;
+    }
+    
+    // Update dragged building position
+    const gridPos = getGridCellUnderMouse(e);
+    if (gridPos) {
+      phase3State.draggedBuilding.x = gridPos.x;
+      phase3State.draggedBuilding.y = gridPos.y;
+      redrawRedesignCanvas();
+    }
+  });
+  
+  canvas.addEventListener('mouseup', (e) => {
+    if (!phase3State.draggedBuilding) return;
+    
+    // Finalize position with collision detection
+    const gridPos = getGridCellUnderMouse(e);
+    if (gridPos) {
+      const finalPos = findValidPosition(phase3State.draggedBuilding, gridPos.x, gridPos.y);
+      phase3State.draggedBuilding.x = finalPos.x;
+      phase3State.draggedBuilding.y = finalPos.y;
+      
+      // Save to adjustments
+      const origKey = `${phase3State.dragStartPos.x},${phase3State.dragStartPos.y}`;
+      phase3State.userAdjustments.set(origKey, phase3State.draggedBuilding);
+    }
+    
+    phase3State.draggedBuilding = null;
+    canvas.classList.remove('dragging');
+    redrawRedesignCanvas();
+    updateRedesignMetrics();
+  });
+}
+
+/**
+ * Get building under mouse position
+ */
+function getBuildingUnderMouse(e) {
+  const canvas = document.getElementById('redesign-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  const gridPos = getGridCellUnderMouse(e);
+  if (!gridPos) return null;
+  
+  let buildings = phase3State.currentTab === 'original'
+    ? phase3State.originalBuildings
+    : phase3State.redesignedBuildings;
+  
+  // Apply adjustments if on redesigned tab
+  if (phase3State.currentTab === 'redesigned' && phase3State.userAdjustments.size > 0) {
+    buildings = buildings.map(b => {
+      const adj = phase3State.userAdjustments.get(`${b.x},${b.y}`);
+      return adj || b;
+    });
+  }
+  
+  return buildings.find(b =>
+    gridPos.x >= b.x && gridPos.x < b.x + b.w &&
+    gridPos.y >= b.y && gridPos.y < b.y + b.l
+  );
+}
+
+/**
+ * Get grid cell under mouse
+ */
+function getGridCellUnderMouse(e) {
+  const canvas = document.getElementById('redesign-canvas');
+  const container = document.getElementById('redesign-canvas-container');
+  const rect = canvas.getBoundingClientRect();
+  
+  const x = (e.clientX - rect.left) / canvas.clientWidth * canvas.width;
+  const y = (e.clientY - rect.top) / canvas.clientHeight * canvas.height;
+  
+  if (x < AXIS_W || y < AXIS_H) return null;
+  
+  const gridX = Math.floor((x - AXIS_W) / CELL);
+  const gridY = Math.floor((y - AXIS_H) / CELL);
+  
+  return { x: gridX, y: gridY };
+}
+
+/**
+ * Find valid position for building, with smart collision avoidance
+ */
+function findValidPosition(building, targetX, targetY) {
+  // Check if target position is valid
+  if (isPositionValid(building, targetX, targetY)) {
+    return { x: targetX, y: targetY };
+  }
+  
+  // Find nearest empty cell
+  const nearest = findNearestEmptyCell(building, targetX, targetY);
+  return nearest || { x: building.x, y: building.y }; // Fallback to original
+}
+
+/**
+ * Check if building can be placed at position without overlap
+ */
+function isPositionValid(building, x, y) {
+  let buildings = phase3State.redesignedBuildings;
+  
+  // Apply adjustments
+  if (phase3State.userAdjustments.size > 0) {
+    buildings = buildings.map(b => {
+      const adj = phase3State.userAdjustments.get(`${b.x},${b.y}`);
+      return adj || b;
+    });
+  }
+  
+  return !buildings.some(b => {
+    if (b === building) return false; // Ignore self
+    
+    // Check overlap
+    const noOverlap =
+      x + building.w <= b.x ||
+      x >= b.x + b.w ||
+      y + building.l <= b.y ||
+      y >= b.y + b.l;
+    
+    return !noOverlap;
+  });
+}
+
+/**
+ * Find nearest empty cell using expanding spiral search
+ */
+function findNearestEmptyCell(building, targetX, targetY) {
+  const maxSearchRadius = 20;
+  
+  // Spiral search outward from target
+  for (let radius = 0; radius <= maxSearchRadius; radius++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        // Only check cells on the perimeter of current radius
+        if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+        
+        const x = targetX + dx;
+        const y = targetY + dy;
+        
+        if (x < 0 || y < 0) continue;
+        
+        if (isPositionValid(building, x, y)) {
+          return { x, y };
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Setup reset button
+ */
+function setupResetButton() {
+  const btn = document.getElementById('redesign-reset-btn');
+  btn.addEventListener('click', () => {
+    document.getElementById('confirmation-dialog').classList.add('visible');
+  });
+}
+
+/**
+ * Setup confirmation dialog
+ */
+function setupConfirmationDialog() {
+  const dialog = document.getElementById('confirmation-dialog');
+  const cancelBtn = document.getElementById('confirm-cancel');
+  const confirmBtn = document.getElementById('confirm-reset');
+  
+  cancelBtn.addEventListener('click', () => {
+    dialog.classList.remove('visible');
+  });
+  
+  confirmBtn.addEventListener('click', () => {
+    dialog.classList.remove('visible');
+    resetToOptimization();
+  });
+  
+  // Close on background click
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      dialog.classList.remove('visible');
+    }
+  });
+}
+
+/**
+ * Reset all adjustments to original optimization
+ */
+function resetToOptimization() {
+  phase3State.userAdjustments = new Map();
+  redrawRedesignCanvas();
+  updateRedesignMetrics();
+}
+
+/**
+ * Update metrics display based on current state
+ */
+function updateRedesignMetrics() {
+  // Get current buildings
+  let buildings = phase3State.redesignedBuildings;
+  if (phase3State.userAdjustments.size > 0) {
+    buildings = buildings.map(b => {
+      const adj = phase3State.userAdjustments.get(`${b.x},${b.y}`);
+      return adj || b;
+    });
+  }
+  
+  // Recalculate metrics
+  const metrics = recalculateMetrics(buildings);
+  
+  // Update display
+  const metricsContainer = document.getElementById('redesign-metrics-list');
+  metricsContainer.innerHTML = '';
+  
+  Object.entries(metrics).forEach(([key, metric]) => {
+    const row = document.createElement('div');
+    row.className = 'metric-row';
+    
+    const before = metric.isPercentage ? `${Math.round(metric.before * 100)}%` : Math.round(metric.before);
+    const after = metric.isPercentage ? `${Math.round(metric.after * 100)}%` : Math.round(metric.after);
+    const delta = metric.after - metric.before;
+    const deltaStr = delta > 0 ? `+${delta.toFixed(1)}` : `${delta.toFixed(1)}`;
+    const color = (metric.goodIfPositive && delta > 0) || (!metric.goodIfPositive && delta < 0) ? '#70a860' : '#d86860';
+    
+    row.innerHTML = `
+      <div class="metric-label">${metric.label}</div>
+      <div class="metric-values">
+        <span>${before} → ${after}</span>
+        <span style="color: ${color}; font-weight: bold;">${deltaStr}</span>
+      </div>
+    `;
+    
+    metricsContainer.appendChild(row);
+  });
+}
+
+/**
+ * Recalculate all metrics for current buildings
+ */
+function recalculateMetrics(buildings) {
+  return {
+    roads: {
+      label: 'Road Segments',
+      before: calculateRoadCount(phase3State.redesignedBuildings),
+      after: calculateRoadCount(buildings),
+      goodIfPositive: false,
+      isPercentage: false,
+    },
+    clustering: {
+      label: 'Clustering Efficiency',
+      before: calculateClusteringScore(phase3State.redesignedBuildings),
+      after: calculateClusteringScore(buildings),
+      goodIfPositive: true,
+      isPercentage: true,
+    },
+    categoryGrouping: {
+      label: 'Category Grouping Score',
+      before: calculateCategoryGrouping(phase3State.redesignedBuildings),
+      after: calculateCategoryGrouping(buildings),
+      goodIfPositive: true,
+      isPercentage: true,
+    },
+    freeSpace: {
+      label: 'Contiguous Free Space',
+      before: calculateFreeSpace(phase3State.redesignedBuildings),
+      after: calculateFreeSpace(buildings),
+      goodIfPositive: true,
+      isPercentage: false,
+    },
+  };
+}
+
+/**
+ * Calculate road count metric
+ */
+function calculateRoadCount(buildings) {
+  return buildings.filter(b => b.road).length;
+}
+
+/**
+ * Calculate clustering efficiency score (0-1)
+ */
+function calculateClusteringScore(buildings) {
+  if (buildings.length === 0) return 0;
+  
+  // Group buildings by type
+  const typeGroups = {};
+  buildings.forEach(b => {
+    if (!typeGroups[b.type]) typeGroups[b.type] = [];
+    typeGroups[b.type].push(b);
+  });
+  
+  // Measure clustering by average distance within types
+  let totalScore = 0;
+  let groupCount = 0;
+  
+  Object.values(typeGroups).forEach(group => {
+    if (group.length < 2) return;
+    
+    let avgDistance = 0;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const dx = group[i].x - group[j].x;
+        const dy = group[i].y - group[j].y;
+        avgDistance += Math.sqrt(dx * dx + dy * dy);
+      }
+    }
+    avgDistance /= (group.length * (group.length - 1) / 2);
+    
+    // Normalize: lower distance = higher score
+    const score = Math.max(0, 1 - (avgDistance / 30));
+    totalScore += score;
+    groupCount++;
+  });
+  
+  return groupCount > 0 ? totalScore / groupCount : 0.5;
+}
+
+/**
+ * Calculate category grouping score (0-1)
+ */
+function calculateCategoryGrouping(buildings) {
+  if (buildings.length === 0) return 0;
+  
+  // Map types to categories
+  const categories = {
+    production: ['production'],
+    residential: ['residential'],
+    military: ['military'],
+    decoration: ['decoration'],
+    special: ['generic_building', 'tower', 'friends_tavern', 'outpost_ship'],
+    hubs: ['hub_main', 'hub_part'],
+  };
+  
+  const buildingsByCategory = {};
+  Object.entries(categories).forEach(([cat, types]) => {
+    buildingsByCategory[cat] = buildings.filter(b => types.includes(b.type));
+  });
+  
+  // Measure grouping
+  let totalScore = 0;
+  let categoryCount = 0;
+  
+  Object.values(buildingsByCategory).forEach(group => {
+    if (group.length < 2) return;
+    
+    let avgDistance = 0;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const dx = group[i].x - group[j].x;
+        const dy = group[i].y - group[j].y;
+        avgDistance += Math.sqrt(dx * dx + dy * dy);
+      }
+    }
+    avgDistance /= (group.length * (group.length - 1) / 2);
+    
+    const score = Math.max(0, 1 - (avgDistance / 40));
+    totalScore += score;
+    categoryCount++;
+  });
+  
+  return categoryCount > 0 ? totalScore / categoryCount : 0.5;
+}
+
+/**
+ * Calculate free space metric (contiguous cells)
+ */
+function calculateFreeSpace(buildings) {
+  // Create occupancy map
+  const maxX = Math.max(...buildings.map(b => b.x + b.w)) + 5;
+  const maxY = Math.max(...buildings.map(b => b.y + b.l)) + 5;
+  
+  const occupied = new Set();
+  buildings.forEach(b => {
+    for (let x = b.x; x < b.x + b.w; x++) {
+      for (let y = b.y; y < b.y + b.l; y++) {
+        occupied.add(`${x},${y}`);
+      }
+    }
+  });
+  
+  // Count free cells (rough estimate: total - occupied)
+  const total = maxX * maxY;
+  return Math.max(0, total - occupied.size);
 }
 
 // Enable the redesign button when a city is loaded

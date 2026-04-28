@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Phase 2 Test - Metrics Panel</title>
+  <style>
+    body { font-family: monospace; background: #1a2230; color: #d0c8b0; padding: 20px; }
+    .test { margin: 20px 0; padding: 10px; background: #1e2d3d; border: 1px solid #2a4060; }
+    .pass { background: #1a3020; color: #70a860; }
+    .fail { background: #3d1a1a; color: #e09080; }
+    .info { background: #1a2a3a; color: #7a9ab0; }
+  </style>
+</head>
+<body>
+  <h1>Phase 2: Metrics Panel Test Suite</h1>
+
+  <div class="test info">
+    <strong>Testing:</strong> Metrics panel rendering, movement changelog, and expand/collapse
+  </div>
+
+  <div id="test-output"></div>
+
+  <script src="redesign-output.js"></script>
+  <script>
+    const output = document.getElementById('test-output');
+    let testsPassed = 0;
+    let testsFailed = 0;
+
+    function log(title, result, details = '') {
+      const className = result ? 'pass' : 'fail';
+      const status = result ? '✓ PASS' : '✗ FAIL';
+      const div = document.createElement('div');
+      div.className = `test ${className}`;
+      div.innerHTML = `<strong>${status}:</strong> ${title}<br><small>${details}</small>`;
+      output.appendChild(div);
+      if (result) testsPassed++; else testsFailed++;
+    }
+
+    // TEST 1: calculateDistance
+    try {
+      const dist = calculateDistance(0, 0, 3, 4);
+      const expected = 5;
+      const passed = Math.abs(dist - expected) < 0.01;
+      log('calculateDistance(0,0,3,4) = 5.0', passed, `Got ${dist.toFixed(2)}`);
+    } catch (e) {
+      log('calculateDistance function exists', false, e.message);
+    }
+
+    // TEST 2: formatMetricNumber
+    try {
+      const tests = [
+        [42, '42'],
+        [3.14159, '3.14'],
+        [0, '0'],
+      ];
+      let passed = true;
+      for (const [input, expected] of tests) {
+        const result = formatMetricNumber(input);
+        if (result !== expected) passed = false;
+      }
+      log('formatMetricNumber precision', passed, 'Integer and decimal formatting');
+    } catch (e) {
+      log('formatMetricNumber function exists', false, e.message);
+    }
+
+    // TEST 3: buildMovementChangelog with sample data
+    try {
+      const original = [
+        { name: 'House 1', type: 'residential', x: 10, y: 20, w: 2, l: 2 },
+        { name: 'Factory', type: 'production', x: 30, y: 40, w: 3, l: 3 },
+        { name: 'House 2', type: 'residential', x: 50, y: 60, w: 2, l: 2 },
+      ];
+      const redesigned = [
+        { name: 'House 1', type: 'residential', x: 12, y: 22, w: 2, l: 2 },  // Moved
+        { name: 'Factory', type: 'production', x: 30, y: 40, w: 3, l: 3 },   // Same
+        { name: 'House 2', type: 'residential', x: 50, y: 60, w: 2, l: 2 },  // Same
+      ];
+      const result = buildMovementChangelog(original, redesigned);
+      const passed = result.movedCount === 1 && result.unchangedCount === 2 && result.changes.length === 1;
+      log('buildMovementChangelog detection', passed, `Moved: ${result.movedCount}, Unchanged: ${result.unchangedCount}, Changes: ${result.changes.length}`);
+    } catch (e) {
+      log('buildMovementChangelog function', false, e.message);
+    }
+
+    // TEST 4: getTypeLabel
+    try {
+      const label = getTypeLabel('greatbuilding');
+      const passed = label === 'Great Building';
+      log('getTypeLabel type mapping', passed, `'greatbuilding' → '${label}'`);
+    } catch (e) {
+      log('getTypeLabel function exists', false, e.message);
+    }
+
+    // TEST 5: renderMetricsComparison (mock DOM)
+    try {
+      // Create mock DOM elements
+      const container = document.createElement('div');
+      const listDiv = document.createElement('div');
+      listDiv.id = 'metrics-list';
+      container.appendChild(listDiv);
+      document.body.appendChild(container);
+
+      const metrics = {
+        roads: {
+          label: 'Road Segments',
+          before: 120,
+          after: 85,
+          goodIfPositive: false,
+        },
+        clustering: {
+          label: 'Clustering Score',
+          before: 0.65,
+          after: 0.78,
+          isPercentage: true,
+          goodIfPositive: true,
+        },
+      };
+
+      renderMetricsComparison(metrics);
+      const rows = listDiv.querySelectorAll('.metric-row');
+      const passed = rows.length === 2;
+      log('renderMetricsComparison rendering', passed, `Rendered ${rows.length} metric rows (expected 2)`);
+      container.remove();
+    } catch (e) {
+      log('renderMetricsComparison render', false, e.message);
+    }
+
+    // TEST 6: escapeHtml
+    try {
+      const tests = [
+        ['<script>', '&lt;script&gt;'],
+        ['A & B', 'A &amp; B'],
+        ['"quoted"', '&quot;quoted&quot;'],
+      ];
+      let passed = true;
+      for (const [input, expected] of tests) {
+        const result = escapeHtml(input);
+        if (result !== expected) {
+          console.log(`escapeHtml('${input}') = '${result}', expected '${expected}'`);
+          passed = false;
+        }
+      }
+      log('escapeHtml safety', passed, 'Handles special characters');
+    } catch (e) {
+      log('escapeHtml function exists', false, e.message);
+    }
+
+    // Summary
+    setTimeout(() => {
+      const summary = document.createElement('div');
+      summary.className = 'test info';
+      summary.innerHTML = `
+        <strong>Test Summary:</strong><br>
+        Passed: <span style="color: #70a860;">${testsPassed}</span><br>
+        Failed: <span style="color: #e09080;">${testsFailed}</span><br>
+        Total: ${testsPassed + testsFailed}
+      `;
+      output.appendChild(summary);
+    }, 100);
+  </script>
+</body>
+</html>
