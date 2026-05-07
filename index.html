@@ -45,6 +45,29 @@ body { background: #1a2230; color: #d0c8b0; font-family: 'Segoe UI', sans-serif;
 #loading-msg { margin-top: 18px; color: #8a9aaa; font-size: 0.82rem; display: none; }
 .clipboard-note { margin-top: 20px; font-size: 0.74rem; color: #4a5a6a; line-height: 1.5; }
 
+/* ── Saved Cities ──────────────────────────────────────────────────── */
+.saved-header { font-size: 0.8rem; color: #6a8aaa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.saved-card {
+  background: #1e2d3d; border: 1px solid #2a4060; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 8px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.saved-card:hover { border-color: #3a6080; }
+.saved-info { flex: 1; min-width: 0; }
+.saved-name { font-size: 0.9rem; color: #e8d8a0; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.saved-meta { font-size: 0.72rem; color: #6a8aaa; }
+.saved-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.load-saved-btn {
+  background: #2e6da4; color: #e8f4ff; border: none; border-radius: 6px;
+  padding: 5px 12px; font-size: 0.78rem; cursor: pointer;
+}
+.load-saved-btn:hover { background: #3a7fbf; }
+.del-saved-btn {
+  background: #3d1a1a; color: #e09080; border: 1px solid #6a3030; border-radius: 6px;
+  padding: 5px 10px; font-size: 0.78rem; cursor: pointer;
+}
+.del-saved-btn:hover { background: #5a2020; }
+
 /* ── Viewer screen ─────────────────────────────────────────────── */
 #viewer-screen { display: none; padding: 20px; }
 
@@ -627,6 +650,12 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
       If the button doesn&rsquo;t work, use the file option above.
     </p>
   </div>
+
+  <!-- ── Saved Cities ──────────────────────────────────────────────── -->
+  <div id="saved-cities-section" style="max-width:540px;margin:24px auto 0;display:none;">
+    <p class="saved-header">Saved Cities</p>
+    <div id="saved-cities-list"></div>
+  </div>
 </div>
 
 <!-- ── Viewer Screen ──────────────────────────────────────────────────── -->
@@ -634,6 +663,7 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
   <div class="toolbar">
     <h1>FoE City Planner</h1>
     <span id="city-name" class="city-name"></span>
+    <button class="back-btn" id="save-btn">&#128190; Save Version</button>
     <button class="back-btn" id="back-btn">&#8617; Load New City</button>
   </div>
   <p class="subtitle" id="city-subtitle"></p>
@@ -929,7 +959,118 @@ document.getElementById('file-input').addEventListener('change', e => {
   e.target.value = '';
 });
 
-document.getElementById('back-btn').addEventListener('click', () => showScreen('import'));
+document.getElementById('back-btn').addEventListener('click', () => { showScreen('import'); refreshSavedList(); });
+
+// ── IndexedDB city storage ────────────────────────────────────────────────
+const DB_NAME = 'FoECityPlanner', DB_VER = 1, STORE = 'cities';
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, DB_VER);
+    r.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE))
+        db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+    };
+    r.onsuccess = e => res(e.target.result);
+    r.onerror   = e => rej(e.target.error);
+  });
+}
+
+function dbSaveCity(name) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const record = {
+      name,
+      filename:      cityState.filename || `Player ${cityState.playerId}`,
+      savedAt:       new Date().toISOString(),
+      playerId:      cityState.playerId,
+      buildings:     cityState.buildings,
+      roads:         cityState.roads,
+      greatBuildings:cityState.greatBuildings,
+      unlockedAreas: cityState.unlockedAreas,
+      fixedSet:      [...cityState.fixedSet],
+    };
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).add(record);
+    req.onsuccess = () => res();
+    req.onerror   = e => rej(e.target.error);
+  }));
+}
+
+function dbLoadAll() {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx  = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror   = e => rej(e.target.error);
+  }));
+}
+
+function dbDelete(id) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx  = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = () => res();
+    req.onerror   = e => rej(e.target.error);
+  }));
+}
+
+function restoreFromRecord(record) {
+  cityState = {
+    buildings:      record.buildings,
+    roads:          record.roads,
+    greatBuildings: record.greatBuildings,
+    unlockedAreas:  record.unlockedAreas,
+    playerId:       record.playerId,
+    fixedSet:       new Set(record.fixedSet),
+    filename:       record.filename,
+  };
+  document.getElementById('city-name').textContent = record.name;
+  drawCanvas();
+  updatePanel();
+  showScreen('viewer');
+  enableRedesignButton();
+}
+
+function refreshSavedList() {
+  dbLoadAll().then(records => {
+    const section = document.getElementById('saved-cities-section');
+    const list    = document.getElementById('saved-cities-list');
+    list.innerHTML = '';
+    if (!records.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    const sorted = records.slice().sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    for (const rec of sorted) {
+      const date = new Date(rec.savedAt).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+      const card = document.createElement('div');
+      card.className = 'saved-card';
+      card.innerHTML = `
+        <div class="saved-info">
+          <span class="saved-name">${rec.name}</span>
+          <span class="saved-meta">${rec.filename} &bull; ${rec.buildings.length} buildings &bull; ${date}</span>
+        </div>
+        <div class="saved-actions">
+          <button class="load-saved-btn">Load</button>
+          <button class="del-saved-btn">✕</button>
+        </div>`;
+      card.querySelector('.load-saved-btn').onclick = () => restoreFromRecord(rec);
+      card.querySelector('.del-saved-btn').onclick  = () => dbDelete(rec.id).then(refreshSavedList);
+      list.appendChild(card);
+    }
+  });
+}
+
+document.getElementById('save-btn').addEventListener('click', () => {
+  if (!cityState) return;
+  const def  = cityState.filename || `Player ${cityState.playerId}`;
+  const date = new Date().toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+  const name = prompt('Save this city as:', `${def} — ${date}`);
+  if (!name) return;
+  dbSaveCity(name).then(() => alert(`"${name}" saved!`));
+});
+
+// Load saved list on startup
+refreshSavedList();
 
 document.getElementById('reset-btn').addEventListener('click', () => {
   if (!cityState) return;
