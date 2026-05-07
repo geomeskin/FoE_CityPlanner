@@ -50,6 +50,11 @@ body { background: #1a2230; color: #d0c8b0; font-family: 'Segoe UI', sans-serif;
 
 .toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 4px; }
 .toolbar h1 { font-size: 1.2rem; color: #e8d8a0; letter-spacing: 1px; }
+.city-name {
+  font-size: 0.95rem; color: #e8d8a0; background: #141e2a;
+  border: 1px solid #2a4060; border-radius: 6px;
+  padding: 4px 12px; font-weight: 600; letter-spacing: 0.3px;
+}
 .back-btn {
   margin-left: auto; background: #1e2d3d; color: #8ab8d8;
   border: 1px solid #2a4060; border-radius: 6px;
@@ -628,6 +633,7 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
 <div id="viewer-screen">
   <div class="toolbar">
     <h1>FoE City Planner</h1>
+    <span id="city-name" class="city-name"></span>
     <button class="back-btn" id="back-btn">&#8617; Load New City</button>
   </div>
   <p class="subtitle" id="city-subtitle"></p>
@@ -874,13 +880,14 @@ function parseCity(jsonText) {
 }
 
 // ── Load entry point ──────────────────────────────────────────────────────
-function loadFromText(text) {
+function loadFromText(text, filename) {
   showError(null);
   showLoading(true);
   setTimeout(() => {
     try {
       const parsed = parseCity(text.trim());
-      cityState = { ...parsed, fixedSet: defaultFixedSet(parsed.buildings) };
+      cityState = { ...parsed, fixedSet: defaultFixedSet(parsed.buildings), filename: filename || null };
+      document.getElementById('city-name').textContent = filename || `Player ${parsed.playerId}`;
       drawCanvas();
       updatePanel();
       showScreen('viewer');
@@ -916,7 +923,7 @@ document.getElementById('file-input').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload  = ev => loadFromText(ev.target.result);
+  reader.onload  = ev => loadFromText(ev.target.result, file.name);
   reader.onerror = ()  => showError('Could not read file.');
   reader.readAsText(file);
   e.target.value = '';
