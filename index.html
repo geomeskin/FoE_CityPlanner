@@ -689,6 +689,7 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
 <!-- ── Redesign Results Screen (Phase 3) ──────────────────────────────── -->
 <div id="redesign-results-screen">
   <div class="redesign-header">
+    <button class="back-btn" id="redesign-back-btn">&#8617; Back to City</button>
     <h1>Fine-Tune Your Layout</h1>
     <div class="layout-tabs">
       <button class="tab-button active" data-tab="original">Original Layout</button>
@@ -1407,7 +1408,12 @@ function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metri
   // Hide viewer, show redesign results
   document.getElementById('viewer-screen').style.display = 'none';
   document.getElementById('redesign-results-screen').style.display = 'flex';
-  
+
+  document.getElementById('redesign-back-btn').onclick = () => {
+    document.getElementById('redesign-results-screen').style.display = 'none';
+    document.getElementById('viewer-screen').style.display = 'block';
+  };
+
   // Setup tabs
   setupTabSwitching();
   
