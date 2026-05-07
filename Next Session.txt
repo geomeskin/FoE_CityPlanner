@@ -1,0 +1,52 @@
+SESSION HANDOFF — 2026-04-30
+=============================
+
+WHAT WAS FIXED THIS SESSION
+-----------------------------
+1. Replaced mock optimizer (random ±8 displacement) with runPacker() — real no-overlap
+   first-fit-decreasing packer using the actual UnlockedAreas grid as the boundary.
+2. Wired onRedesignButtonClick → showRedesignResultsScreen so the redesign canvas
+   actually appears when you click "Plan Redesign".
+3. Fixed redrawRedesignCanvas to draw the real unlocked/locked cell background
+   (tan = unlocked, dark blue = locked) instead of a black void.
+
+WHAT STILL NEEDS DOING (in order)
+------------------------------------
+1. ROAD GENERATION — biggest remaining gap.
+   After packing, there is no road network drawn on the redesigned canvas.
+   Algorithm to build:
+     a) Find town hall (type === 'main_building')
+     b) Start with its perimeter cells as the "road frontier"
+     c) For each road-requiring building (b.road === true), BFS from building
+        outward until hitting the frontier, then add those path cells as roads
+     d) Newly added road cells join the frontier for subsequent buildings
+     e) Return array of {x, y, w:1, l:1} road tiles
+   Wire result into redrawRedesignCanvas (draw roads before buildings, same style
+   as drawCanvas: '#4a5560' for 1×1 cobblestone).
+
+2. SPACE SLIDER — currently reads sl-space but value is unused in runPacker.
+   Idea: when space weight is high, after packing run a compaction pass that
+   tries to shift each building toward the town hall one step at a time.
+
+3. MULTIPLE SA RESTARTS — run the packer + a simulated annealing shuffle N times,
+   keep the layout with the best score (fewest road tiles + most compact).
+   SA move: swap two movable buildings' positions. Score: road tile count.
+
+4. SET DETECTION — colored dots on buildings that belong to the same named set
+   (e.g. "Shrines of Knowledge"). Buildings sharing a name prefix group into sets.
+   Show a colored dot per set in the top-left corner of each building tile.
+
+KEY FILE / LINE REFERENCES
+-----------------------------
+- index.html ~1267  onRedesignButtonClick()  — entry point for redesign
+- index.html ~1292  runPacker()              — the new packer (replace/extend here)
+- index.html ~1440  redrawRedesignCanvas()   — add road drawing here (before buildings)
+- redesign-output.js initializeMetricsPanel() — metrics side panel (works fine)
+
+DATA SHAPES
+------------
+- cityState.buildings   [{type, name, x, y, w, l, road}]  road=true → needs adjacency
+- cityState.unlockedAreas [{x, y, width, length}]          some omit y → treat as 0
+- cityState.fixedSet    Set of "x,y" strings
+- cityState.roads       [{x, y, w, l}]                     original road tiles (reference)
+- Town hall:            b.type === 'main_building'

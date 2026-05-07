@@ -772,11 +772,7 @@ let cityState = null; // { roads, buildings, greatBuildings, unlockedAreas, play
 function buildingKey(b) { return `${b.x},${b.y}`; }
 
 function defaultFixedSet(buildings) {
-  return new Set(
-    buildings
-      .filter(b => b.type === 'main_building' || b.type === 'greatbuilding')
-      .map(buildingKey)
-  );
+  return new Set(); // nothing locked by default — user opts in by clicking
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────
@@ -1270,93 +1266,103 @@ function enableRedesignButton() {
 
 function onRedesignButtonClick() {
   if (!cityState) return;
-  
-  // Get current weights from sliders
-  const weights = {
-    roads: parseFloat(document.getElementById('sl-roads').value) || 7,
-    identical: parseFloat(document.getElementById('sl-identical').value) || 7,
-    category: parseFloat(document.getElementById('sl-category').value) || 5,
-    space: parseFloat(document.getElementById('sl-space').value) || 3,
-  };
-  
-  // TODO: Call actual optimization algorithm here
-  // For now, we'll create a mock redesign to demonstrate the metrics panel
-  
+
   const originalBuildings = JSON.parse(JSON.stringify(cityState.buildings));
-  const redesignedBuildings = createMockRedesign(originalBuildings, weights);
-  const metrics = calculateMockMetrics(originalBuildings, redesignedBuildings, weights);
-  
-  // Display the metrics
+  const redesignedBuildings = runPacker(originalBuildings, cityState.unlockedAreas, cityState.fixedSet);
+  const metrics = computeMetrics(originalBuildings, redesignedBuildings);
+
+  showRedesignResultsScreen(originalBuildings, redesignedBuildings, metrics);
   initializeMetricsPanel(originalBuildings, redesignedBuildings, metrics);
 }
 
-/**
- * Mock redesign for demonstration (shuffles some buildings)
- */
-function createMockRedesign(originalBuildings, weights) {
-  const redesigned = JSON.parse(JSON.stringify(originalBuildings));
-  
-  // Create some mock displacement based on weights
-  const displacementFactor = (weights.roads + weights.identical + weights.category) / 10;
-  
-  // Move ~30-50% of buildings based on weights
-  const moveCount = Math.floor(redesigned.length * Math.min(0.5, displacementFactor / 10));
-  const indices = Array.from({ length: redesigned.length }, (_, i) => i)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, moveCount);
-  
-  for (const idx of indices) {
-    const b = redesigned[idx];
-    if (b.type === 'main_building' || b.type === 'greatbuilding') continue; // Don't move fixed
-    
-    // Random displacement within reasonable bounds
-    b.x += Math.floor((Math.random() - 0.5) * 8);
-    b.y += Math.floor((Math.random() - 0.5) * 8);
-    b.x = Math.max(0, b.x);
-    b.y = Math.max(0, b.y);
+function runPacker(buildings, unlockedAreas, fixedSet) {
+  // Build unlocked cell set
+  const unlocked = new Set();
+  for (const a of unlockedAreas) {
+    const ax = a.x ?? 0, ay = a.y ?? 0;
+    for (let dy = 0; dy < (a.length || 0); dy++)
+      for (let dx = 0; dx < (a.width || 0); dx++)
+        unlocked.add(`${ax + dx},${ay + dy}`);
   }
-  
-  return redesigned;
+
+  const occupied = new Set();
+
+  function canPlace(x, y, w, l) {
+    for (let dy = 0; dy < l; dy++)
+      for (let dx = 0; dx < w; dx++) {
+        const k = `${x + dx},${y + dy}`;
+        if (!unlocked.has(k) || occupied.has(k)) return false;
+      }
+    return true;
+  }
+
+  function markOccupied(b) {
+    for (let dy = 0; dy < b.l; dy++)
+      for (let dx = 0; dx < b.w; dx++)
+        occupied.add(`${b.x + dx},${b.y + dy}`);
+  }
+
+  function findSpot(w, l) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const k of unlocked) {
+      const [cx, cy] = k.split(',').map(Number);
+      if (cx < minX) minX = cx; if (cy < minY) minY = cy;
+      if (cx > maxX) maxX = cx; if (cy > maxY) maxY = cy;
+    }
+    for (let y = minY; y <= maxY - l + 1; y++)
+      for (let x = minX; x <= maxX - w + 1; x++)
+        if (canPlace(x, y, w, l)) return { x, y };
+    return null;
+  }
+
+  const result = [];
+
+  // Keep fixed buildings and town hall in place
+  for (const b of buildings) {
+    if (fixedSet.has(buildingKey(b)) || b.type === 'main_building') {
+      markOccupied(b);
+      result.push({ ...b });
+    }
+  }
+
+  // Pack movable buildings largest-first
+  const movable = buildings
+    .filter(b => !fixedSet.has(buildingKey(b)) && b.type !== 'main_building')
+    .sort((a, b) => (b.w * b.l) - (a.w * a.l));
+
+  for (const b of movable) {
+    const pos = findSpot(b.w, b.l);
+    if (pos) {
+      const placed = { ...b, x: pos.x, y: pos.y };
+      markOccupied(placed);
+      result.push(placed);
+    } else {
+      result.push({ ...b }); // fallback: keep original if no space found
+    }
+  }
+
+  return result;
 }
 
-/**
- * Calculate mock metrics for demonstration
- */
-function calculateMockMetrics(originalBuildings, redesignedBuildings, weights) {
-  const roadWeight = weights.roads / 10;
-  const identicalWeight = weights.identical / 10;
-  const categoryWeight = weights.category / 10;
-  const spaceWeight = weights.space / 10;
-  
-  // Count road-required buildings
-  const roadsNeeded = originalBuildings.filter(b => b.road).length;
-  const estimatedRoadReduction = Math.floor(roadsNeeded * roadWeight * 0.15); // Estimate 15% reduction per weight
-  
+function computeMetrics(original, redesigned) {
   return {
     roads: {
-      label: 'Road Segments',
-      before: roadsNeeded,
-      after: Math.max(0, roadsNeeded - estimatedRoadReduction),
+      label: 'Road-Required Buildings',
+      before: original.filter(b => b.road).length,
+      after: redesigned.filter(b => b.road).length,
       goodIfPositive: false,
     },
     clustering: {
       label: 'Clustering Efficiency',
-      before: 0.65 + (identicalWeight * 0.2),
-      after: 0.75 + (identicalWeight * 0.25),
-      isPercentage: true,
-      goodIfPositive: true,
-    },
-    categoryGrouping: {
-      label: 'Category Grouping Score',
-      before: 0.58,
-      after: 0.68 + (categoryWeight * 0.15),
+      before: calculateClusteringScore(original),
+      after: calculateClusteringScore(redesigned),
       isPercentage: true,
       goodIfPositive: true,
     },
     freeSpace: {
-      label: 'Contiguous Free Space',
-      before: 42,
-      after: 48 + Math.floor(spaceWeight * 10),
+      label: 'Free Space (cells)',
+      before: calculateFreeSpace(original),
+      after: calculateFreeSpace(redesigned),
       goodIfPositive: true,
     },
   };
@@ -1476,12 +1482,25 @@ function redrawRedesignCanvas() {
   
   ctx.scale(scale, scale);
   
-  // Draw grid background
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(0, 0, canvasW, canvasH);
-  
-  // Draw grid lines
-  ctx.strokeStyle = '#1a3050';
+  // Build unlocked bitmap for background
+  const unlockedCells = new Set();
+  for (const a of cityState.unlockedAreas) {
+    const ax = a.x ?? 0, ay = a.y ?? 0;
+    for (let dy = 0; dy < (a.length || 0); dy++)
+      for (let dx = 0; dx < (a.width || 0); dx++)
+        unlockedCells.add(`${ax + dx},${ay + dy}`);
+  }
+
+  // Draw cell background (unlocked = tan, locked = dark)
+  for (let gy = 0; gy < maxY; gy++) {
+    for (let gx = 0; gx < maxX; gx++) {
+      ctx.fillStyle = unlockedCells.has(`${gx},${gy}`) ? '#b89a5e' : '#1e3248';
+      ctx.fillRect(AXIS_W + gx * CELL, AXIS_H + gy * CELL, CELL, CELL);
+    }
+  }
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
   ctx.lineWidth = 0.5;
   for (let i = 0; i <= maxX; i++) {
     ctx.beginPath();
