@@ -1035,7 +1035,7 @@ function drawCanvas() {
 
     ctx.fillStyle = TYPE_COLORS[b.type] || '#888';
     ctx.fillRect(px, py, pw, ph);
-    ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 1;
     ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
 
     if (b.road) {
@@ -1535,9 +1535,9 @@ function redrawRedesignCanvas() {
     ctx.fillRect(x, y, w, h);
     
     // Border
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(x, y, w, h);
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
   });
 }
 
