@@ -1326,9 +1326,16 @@ function runPacker(buildings, unlockedAreas, fixedSet) {
     }
   }
 
-  // Pack movable buildings largest-first
+  function isOnsite(b) {
+    for (let dy = 0; dy < b.l; dy++)
+      for (let dx = 0; dx < b.w; dx++)
+        if (unlocked.has(`${b.x + dx},${b.y + dy}`)) return true;
+    return false;
+  }
+
+  // Pack movable on-site buildings largest-first; skip off-site (Friends Tavern, etc.)
   const movable = buildings
-    .filter(b => !fixedSet.has(buildingKey(b)) && b.type !== 'main_building')
+    .filter(b => !fixedSet.has(buildingKey(b)) && b.type !== 'main_building' && isOnsite(b))
     .sort((a, b) => (b.w * b.l) - (a.w * a.l));
 
   for (const b of movable) {
