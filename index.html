@@ -82,7 +82,15 @@ canvas { display: block; }
   display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem;
 }
 .lock-dot { width: 8px; height: 8px; background: #40d0c0; display: inline-block; border-radius: 1px; }
-.stats { margin-top: 10px; font-size: 0.75rem; color: #8a9aaa; }
+.stats-bar {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+}
+.stat-item {
+  background: #141e2a; border: 1px solid #2a4060; border-radius: 6px;
+  padding: 6px 14px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.stat-val { font-size: 1.1rem; font-weight: 700; color: #e8d8a0; }
+.stat-lbl { font-size: 0.7rem; color: #6a8aaa; text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* ── Priority panel ────────────────────────────────────────────── */
 #priority-panel {
@@ -645,7 +653,14 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
     <span><span class="swatch" style="background:#2e5fa3;border:2px solid #70b8ff;"></span>Great Building</span>
     <span class="lock-swatch"><span class="lock-dot"></span>Fixed (won&rsquo;t move)</span>
   </div>
-  <div class="stats" id="stats"></div>
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-item"><span class="stat-val" id="stat-buildings">—</span><span class="stat-lbl">Buildings</span></div>
+    <div class="stat-item"><span class="stat-val" id="stat-gbs">—</span><span class="stat-lbl">Great Buildings</span></div>
+    <div class="stat-item"><span class="stat-val" id="stat-unlocked">—</span><span class="stat-lbl">Unlocked Cells</span></div>
+    <div class="stat-item"><span class="stat-val" id="stat-road-req">—</span><span class="stat-lbl">Need Road</span></div>
+    <div class="stat-item"><span class="stat-val" id="stat-road-free">—</span><span class="stat-lbl">Road-Free</span></div>
+    <div class="stat-item"><span class="stat-val" id="stat-roads">—</span><span class="stat-lbl">Road Segments</span></div>
+  </div>
 
   <!-- ── Metrics Panel (Phase 2) ──────────────────────────────── -->
   <div id="metrics-panel">
@@ -1066,16 +1081,16 @@ function drawCanvas() {
     ctx.fillRect(px + 1, py + 1, 6, 6);
   }
 
-  // Stats
+  // Stats bar
   const totalUnlocked = unlocked.reduce((s, v) => s + v, 0);
   const roadReq  = buildings.filter(b => b.road).length;
   const roadFree = buildings.filter(b => !b.road && b.type !== 'greatbuilding').length;
-  document.getElementById('stats').textContent =
-    `Grid: x ${gridX0}–${gridX1}, y ${gridY0}–${gridY1}  |  ` +
-    `Unlocked cells: ${totalUnlocked}  |  ` +
-    `Great Buildings: ${greatBuildings.length}  |  ` +
-    `Road-required: ${roadReq}  |  Road-free: ${roadFree}  |  ` +
-    `Road segments: ${roads.length}`;
+  document.getElementById('stat-buildings').textContent = buildings.length;
+  document.getElementById('stat-gbs').textContent       = greatBuildings.length;
+  document.getElementById('stat-unlocked').textContent  = totalUnlocked;
+  document.getElementById('stat-road-req').textContent  = roadReq;
+  document.getElementById('stat-road-free').textContent = roadFree;
+  document.getElementById('stat-roads').textContent     = roads.length;
 
   document.getElementById('city-subtitle').textContent =
     `Player ${playerId}  |  ${buildings.length} buildings  |  ` +
