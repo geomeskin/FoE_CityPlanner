@@ -981,23 +981,18 @@ function drawCanvas() {
     fixedDot: '#40d0c0',
   };
 
-  // Background
+  // Background + per-cell border on unlocked cells
+  ctx.lineWidth = 0.5;
   for (let row = 0; row < rows; row++)
     for (let col = 0; col < cols; col++) {
-      ctx.fillStyle = unlocked[row * cols + col] ? C.unlocked : C.locked;
+      const isUnlocked = unlocked[row * cols + col];
+      ctx.fillStyle = isUnlocked ? C.unlocked : C.locked;
       ctx.fillRect(AXIS_W + col * CELL, AXIS_H + row * CELL, CELL, CELL);
+      if (isUnlocked) {
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.strokeRect(AXIS_W + col * CELL + 0.5, AXIS_H + row * CELL + 0.5, CELL - 1, CELL - 1);
+      }
     }
-
-  // Grid lines — fine
-  ctx.strokeStyle = C.gridFine; ctx.lineWidth = 0.5;
-  for (let col = 0; col <= cols; col++) {
-    const px = AXIS_W + col * CELL + 0.5;
-    ctx.beginPath(); ctx.moveTo(px, AXIS_H); ctx.lineTo(px, AXIS_H + rows * CELL); ctx.stroke();
-  }
-  for (let row = 0; row <= rows; row++) {
-    const py = AXIS_H + row * CELL + 0.5;
-    ctx.beginPath(); ctx.moveTo(AXIS_W, py); ctx.lineTo(AXIS_W + cols * CELL, py); ctx.stroke();
-  }
 
   // Grid lines — chunk
   ctx.strokeStyle = C.gridChunk; ctx.lineWidth = 1;
