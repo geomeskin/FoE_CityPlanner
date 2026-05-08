@@ -426,12 +426,12 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
 #redesign-canvas-container {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   background: #0a0a0a;
   border: 1px solid #2a4060;
   border-radius: 4px;
-  overflow: hidden;
+  overflow: auto;
   position: relative;
 }
 
@@ -761,6 +761,12 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
   
   <div class="redesign-body">
     <div class="redesign-canvas-area">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+        <button onclick="changeZoom(1.25)" style="padding:2px 10px;font-size:1rem;background:#1e3248;color:#ccc;border:1px solid #2a4060;border-radius:3px;cursor:pointer;">+</button>
+        <button onclick="changeZoom(0.8)"  style="padding:2px 10px;font-size:1rem;background:#1e3248;color:#ccc;border:1px solid #2a4060;border-radius:3px;cursor:pointer;">−</button>
+        <button onclick="changeZoom(0)"    style="padding:2px 8px;font-size:0.8rem;background:#1e3248;color:#ccc;border:1px solid #2a4060;border-radius:3px;cursor:pointer;">Fit</button>
+        <span id="zoom-label" style="font-size:0.8rem;color:#9ab0c0;">100%</span>
+      </div>
       <div id="redesign-canvas-container">
         <canvas id="redesign-canvas"></canvas>
       </div>
@@ -1778,11 +1784,24 @@ let phase3State = {
   currentTab: 'original',
   originalBuildings: [],
   redesignedBuildings: [],
-  userAdjustments: new Map(), // Key: "x,y", Value: building object
+  userAdjustments: new Map(),
   currentMetrics: {},
   draggedBuilding: null,
   dragStartPos: null,
+  zoom: 1,
 };
+
+function changeZoom(factor) {
+  if (factor === 0) {
+    phase3State.zoom = 1; // reset to fit
+  } else {
+    phase3State.zoom = Math.max(0.25, Math.min(8, (phase3State.zoom || 1) * factor));
+  }
+  const pct = Math.round(phase3State.zoom * 100);
+  const lbl = document.getElementById('zoom-label');
+  if (lbl) lbl.textContent = factor === 0 ? 'Fit' : `${pct}%`;
+  redrawRedesignCanvas();
+}
 
 /**
  * Show the redesign results screen and initialize Phase 3
@@ -1795,6 +1814,7 @@ function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metri
   phase3State.userAdjustments = new Map();
   phase3State.generatedRoads = generatedRoads || [];
   phase3State.currentTab = 'original';
+  phase3State.zoom = 1;
   
   // Hide viewer, show redesign results
   document.getElementById('viewer-screen').style.display = 'none';
@@ -1878,13 +1898,12 @@ function redrawRedesignCanvas() {
   const canvasH = AXIS_H + maxY * CELL + PAD * 2;
   
   // Set canvas size with scaling
-  const containerW = container.clientWidth - 32; // Padding
-  const containerH = container.clientHeight - 32;
-  const scale = Math.min(containerW / canvasW, containerH / canvasH, 1);
-  
-  canvas.width = canvasW * scale;
+  const fitScale = Math.min((container.clientWidth - 4) / canvasW, (container.clientHeight - 4) / canvasH);
+  const scale = (phase3State.zoom || 1) * fitScale;
+
+  canvas.width  = canvasW * scale;
   canvas.height = canvasH * scale;
-  
+
   ctx.scale(scale, scale);
   
   // Build unlocked bitmap for background
@@ -1928,8 +1947,14 @@ function redrawRedesignCanvas() {
     }
   }
 
-  // Draw buildings
+  // Draw buildings (skip off-site buildings — Friends Tavern, outposts, etc.)
   buildings.forEach(b => {
+    let onsite = false;
+    for (let dy = 0; dy < b.l && !onsite; dy++)
+      for (let dx = 0; dx < b.w && !onsite; dx++)
+        if (unlockedCells.has(`${b.x+dx},${b.y+dy}`)) onsite = true;
+    if (!onsite) return;
+
     const x = AXIS_W + b.x * CELL;
     const y = AXIS_H + b.y * CELL;
     const w = b.w * CELL;
