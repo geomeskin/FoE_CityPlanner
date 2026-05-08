@@ -67,6 +67,11 @@ body { background: #1a2230; color: #d0c8b0; font-family: 'Segoe UI', sans-serif;
   padding: 5px 10px; font-size: 0.78rem; cursor: pointer;
 }
 .del-saved-btn:hover { background: #5a2020; }
+.exp-saved-btn {
+  background: #1a3020; color: #70a860; border: 1px solid #3a6040; border-radius: 6px;
+  padding: 5px 10px; font-size: 0.78rem; cursor: pointer;
+}
+.exp-saved-btn:hover { background: #2a4a30; }
 
 /* ── Viewer screen ─────────────────────────────────────────────── */
 #viewer-screen { display: none; padding: 20px; }
@@ -653,7 +658,13 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
 
   <!-- ── Saved Cities ──────────────────────────────────────────────── -->
   <div id="saved-cities-section" style="max-width:540px;margin:24px auto 0;display:none;">
-    <p class="saved-header">Saved Cities</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <p class="saved-header" style="margin:0;">Saved Cities</p>
+      <label class="file-label" style="font-size:0.78rem;">
+        &#128229; Import save file
+        <input type="file" id="import-save-input" accept=".json" style="display:none">
+      </label>
+    </div>
     <div id="saved-cities-list"></div>
   </div>
 </div>
@@ -1032,6 +1043,42 @@ function restoreFromRecord(record) {
   enableRedesignButton();
 }
 
+function exportSave(rec) {
+  const blob = new Blob([JSON.stringify(rec, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const safe = rec.name.replace(/[^a-z0-9_\-]/gi, '_');
+  a.href = url; a.download = `FoE_save_${safe}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importSaveFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const rec = JSON.parse(ev.target.result);
+      if (!rec.buildings || !rec.unlockedAreas) throw new Error('Not a valid FoE save file.');
+      delete rec.id; // let IndexedDB assign a new ID
+      openDB().then(db => new Promise((res, rej) => {
+        const tx  = db.transaction(STORE, 'readwrite');
+        const req = tx.objectStore(STORE).add(rec);
+        req.onsuccess = () => res();
+        req.onerror   = e => rej(e.target.error);
+      })).then(refreshSavedList);
+    } catch (e) {
+      alert('Could not import: ' + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('import-save-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) importSaveFile(file);
+  e.target.value = '';
+});
+
 function refreshSavedList() {
   dbLoadAll().then(records => {
     const section = document.getElementById('saved-cities-section');
@@ -1051,10 +1098,12 @@ function refreshSavedList() {
         </div>
         <div class="saved-actions">
           <button class="load-saved-btn">Load</button>
+          <button class="exp-saved-btn">&#128229; Export</button>
           <button class="del-saved-btn">✕</button>
         </div>`;
       card.querySelector('.load-saved-btn').onclick = () => restoreFromRecord(rec);
       card.querySelector('.del-saved-btn').onclick  = () => dbDelete(rec.id).then(refreshSavedList);
+      card.querySelector('.exp-saved-btn').onclick  = () => exportSave(rec);
       list.appendChild(card);
     }
   });
