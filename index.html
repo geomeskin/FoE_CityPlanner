@@ -1574,8 +1574,9 @@ self.onmessage = function(e) {
         clearInterval(timer);
         btn.disabled = false;
         btn.textContent = 'Plan Redesign →';
+        const generatedRoads = generateRoads(bestLayout, cityState.unlockedAreas);
         const metrics = computeMetrics(originalBuildings, bestLayout);
-        showRedesignResultsScreen(originalBuildings, bestLayout, metrics);
+        showRedesignResultsScreen(originalBuildings, bestLayout, metrics, generatedRoads);
         initializeMetricsPanel(originalBuildings, bestLayout, metrics);
       }
     };
@@ -1593,6 +1594,79 @@ self.onmessage = function(e) {
       }
     };
   }
+}
+
+function generateRoads(buildings, unlockedAreas) {
+  const unlocked = new Set();
+  for (const a of unlockedAreas) {
+    const ax = a.x ?? 0, ay = a.y ?? 0;
+    for (let dy = 0; dy < (a.length || 0); dy++)
+      for (let dx = 0; dx < (a.width || 0); dx++)
+        unlocked.add(`${ax+dx},${ay+dy}`);
+  }
+
+  const townHall = buildings.find(b => b.type === 'main_building');
+  if (!townHall) return [];
+
+  // Road frontier starts at town hall perimeter
+  const roadCells = new Set();
+  for (let dy = -1; dy <= townHall.l; dy++)
+    for (let dx = -1; dx <= townHall.w; dx++) {
+      if (dy >= 0 && dy < townHall.l && dx >= 0 && dx < townHall.w) continue;
+      const k = `${townHall.x+dx},${townHall.y+dy}`;
+      if (unlocked.has(k)) roadCells.add(k);
+    }
+
+  // Building footprint set (to avoid placing roads inside buildings)
+  const occupied = new Set();
+  for (const b of buildings)
+    for (let dy = 0; dy < b.l; dy++)
+      for (let dx = 0; dx < b.w; dx++)
+        occupied.add(`${b.x+dx},${b.y+dy}`);
+
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+
+  function bfsConnect(startCells) {
+    // BFS from startCells until we hit a road cell; return path cells
+    const queue = [...startCells].map(k => ({ k, path: [k] }));
+    const visited = new Set(startCells);
+    while (queue.length) {
+      const { k, path } = queue.shift();
+      if (roadCells.has(k)) return path;
+      const [x, y] = k.split(',').map(Number);
+      for (const [dx, dy] of dirs) {
+        const nk = `${x+dx},${y+dy}`;
+        if (!visited.has(nk) && unlocked.has(nk) && !occupied.has(nk)) {
+          visited.add(nk);
+          queue.push({ k: nk, path: [...path, nk] });
+        }
+      }
+    }
+    return [];
+  }
+
+  // Connect each road-requiring building to the frontier
+  const roadBuildings = buildings.filter(b => b.road && b.type !== 'main_building');
+  for (const b of roadBuildings) {
+    // Collect perimeter cells of this building
+    const perim = [];
+    for (let dy = -1; dy <= b.l; dy++)
+      for (let dx = -1; dx <= b.w; dx++) {
+        if (dy >= 0 && dy < b.l && dx >= 0 && dx < b.w) continue;
+        const k = `${b.x+dx},${b.y+dy}`;
+        if (unlocked.has(k) && !occupied.has(k)) perim.push(k);
+      }
+    if (!perim.length) continue;
+    // If already adjacent to a road cell, skip
+    if (perim.some(k => roadCells.has(k))) continue;
+    const path = bfsConnect(perim);
+    for (const k of path) roadCells.add(k);
+  }
+
+  return [...roadCells].map(k => {
+    const [x, y] = k.split(',').map(Number);
+    return { x, y, w: 1, l: 1 };
+  });
 }
 
 function computeMetrics(original, redesigned) {
@@ -1639,12 +1713,13 @@ let phase3State = {
 /**
  * Show the redesign results screen and initialize Phase 3
  */
-function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metrics) {
+function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metrics, generatedRoads) {
   // Save state
   phase3State.originalBuildings = JSON.parse(JSON.stringify(originalBuildings));
   phase3State.redesignedBuildings = JSON.parse(JSON.stringify(redesignedBuildings));
   phase3State.currentMetrics = metrics;
   phase3State.userAdjustments = new Map();
+  phase3State.generatedRoads = generatedRoads || [];
   phase3State.currentTab = 'original';
   
   // Hide viewer, show redesign results
@@ -1771,6 +1846,14 @@ function redrawRedesignCanvas() {
     ctx.stroke();
   }
   
+  // Draw generated roads (redesigned tab only)
+  if (phase3State.currentTab === 'redesigned' && phase3State.generatedRoads) {
+    ctx.fillStyle = '#111111';
+    for (const r of phase3State.generatedRoads) {
+      ctx.fillRect(AXIS_W + r.x * CELL, AXIS_H + r.y * CELL, CELL, CELL);
+    }
+  }
+
   // Draw buildings
   buildings.forEach(b => {
     const x = AXIS_W + b.x * CELL;
