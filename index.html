@@ -1519,7 +1519,7 @@ self.onmessage = function(e) {
     for(const b of shuffled) {
       let found=false;
       outer: for(let y=minY;y<=maxY-b.l+1;y++) for(let x=minX;x<=maxX-b.w+1;x++) if(fits(b,x,y,occ)){const pb={...b,x,y};addOcc(occ,pb);placed.push(pb);found=true;break outer;}
-      if(!found) placed.push({...b});
+      if(!found) { placed.push({...b}); addOcc(occ,b); }
     }
     return placed;
   }
