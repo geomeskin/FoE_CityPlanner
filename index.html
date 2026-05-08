@@ -1483,131 +1483,57 @@ function onRedesignButtonClick() {
   const timer = setInterval(() => {
     const s = Math.floor((Date.now() - start) / 1000);
     const m = Math.floor(s / 60), sec = s % 60;
-    btn.textContent = `Optimizing… ${m}:${String(sec).padStart(2,'0')}`;
+    btn.textContent = `Optimizing… ${m}:${String(sec).padStart(2, '0')}`;
   }, 1000);
   btn.textContent = 'Optimizing… 0:00';
 
   const originalBuildings = JSON.parse(JSON.stringify(cityState.buildings));
+  const fixedSetArr = [...cityState.fixedSet];
+  const RUNS = 6, MAX_ITER = 5000, T0 = 80, T_MIN = 0.5;
 
-  setTimeout(() => {
-    const redesignedBuildings = runSA(originalBuildings, cityState.unlockedAreas, cityState.fixedSet);
-    const metrics = computeMetrics(originalBuildings, redesignedBuildings);
-    clearInterval(timer);
-    btn.disabled = false;
-    btn.textContent = 'Plan Redesign →';
-    showRedesignResultsScreen(originalBuildings, redesignedBuildings, metrics);
-    initializeMetricsPanel(originalBuildings, redesignedBuildings, metrics);
-  }, 50);
-}
+  let bestLayout = null, bestScore = Infinity, done = 0;
 
-function runSA(buildings, unlockedAreas, fixedSet) {
-  const RUNS     = 6;
-  const MAX_ITER = 5000;
-  const T0       = 80;
-  const T_MIN    = 0.5;
-
-  // Build unlocked cell set and bounds
-  const unlocked = new Set();
-  for (const a of unlockedAreas) {
-    const ax = a.x ?? 0, ay = a.y ?? 0;
-    for (let dy = 0; dy < (a.length || 0); dy++)
-      for (let dx = 0; dx < (a.width || 0); dx++)
-        unlocked.add(`${ax+dx},${ay+dy}`);
-  }
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const k of unlocked) {
-    const [x, y] = k.split(',').map(Number);
-    if (x < minX) minX = x; if (y < minY) minY = y;
-    if (x > maxX) maxX = x; if (y > maxY) maxY = y;
-  }
-
-  function isOnsite(b) {
-    for (let dy = 0; dy < b.l; dy++)
-      for (let dx = 0; dx < b.w; dx++)
-        if (unlocked.has(`${b.x+dx},${b.y+dy}`)) return true;
-    return false;
-  }
-
-  const fixed   = buildings.filter(b => fixedSet.has(buildingKey(b)) || b.type === 'main_building' || !isOnsite(b));
-  const movable = buildings.filter(b => !fixedSet.has(buildingKey(b)) && b.type !== 'main_building' && isOnsite(b));
-
-  const townHall = fixed.find(b => b.type === 'main_building');
-  const thCx = townHall ? townHall.x + townHall.w / 2 : 0;
-  const thCy = townHall ? townHall.y + townHall.l / 2 : 0;
-
-  function bScore(b) {
-    const dist = Math.abs(b.x + b.w/2 - thCx) + Math.abs(b.y + b.l/2 - thCy);
-    return b.road ? dist * 2 : dist;
-  }
-
-  function addOcc(occ, b)    { for (let dy=0;dy<b.l;dy++) for (let dx=0;dx<b.w;dx++) occ.add(`${b.x+dx},${b.y+dy}`); }
-  function removeOcc(occ, b) { for (let dy=0;dy<b.l;dy++) for (let dx=0;dx<b.w;dx++) occ.delete(`${b.x+dx},${b.y+dy}`); }
-  function fits(b, x, y, occ) {
-    for (let dy=0;dy<b.l;dy++)
-      for (let dx=0;dx<b.w;dx++) {
-        const k = `${x+dx},${y+dy}`;
-        if (!unlocked.has(k) || occ.has(k)) return false;
+  for (let i = 0; i < RUNS; i++) {
+    const worker = new Worker('sa-worker.js');
+    worker.postMessage({
+      buildings: originalBuildings,
+      unlockedAreas: cityState.unlockedAreas,
+      fixedSetArr,
+      maxIter: MAX_ITER,
+      T0, T_MIN,
+    });
+    worker.onmessage = e => {
+      worker.terminate();
+      if (e.data.score < bestScore) {
+        bestScore  = e.data.score;
+        bestLayout = e.data.layout;
       }
-    return true;
-  }
-
-  function randomPlace(movableBldgs) {
-    const shuffled = [...movableBldgs].sort(() => Math.random() - 0.5);
-    const occ = new Set();
-    addOcc(occ, ...[]); // empty start — fixed buildings not needed for placement check here
-    for (const b of fixed) addOcc(occ, b);
-    const placed = [];
-    for (const b of shuffled) {
-      let found = false;
-      outer: for (let y = minY; y <= maxY - b.l + 1; y++)
-        for (let x = minX; x <= maxX - b.w + 1; x++)
-          if (fits(b, x, y, occ)) { const pb = {...b, x, y}; addOcc(occ, pb); placed.push(pb); found = true; break outer; }
-      if (!found) placed.push({...b});
-    }
-    return placed;
-  }
-
-  const cooling = Math.pow(T_MIN / T0, 1 / MAX_ITER);
-  let bestLayout = null;
-  let bestScore  = Infinity;
-
-  for (let run = 0; run < RUNS; run++) {
-    let current = randomPlace(movable);
-    const occ   = new Set();
-    for (const b of fixed)   addOcc(occ, b);
-    for (const b of current) addOcc(occ, b);
-
-    let curScore = current.reduce((s, b) => s + bScore(b), 0);
-    let T = T0;
-
-    for (let iter = 0; iter < MAX_ITER; iter++) {
-      const i = Math.floor(Math.random() * current.length);
-      const j = Math.floor(Math.random() * current.length);
-      if (i === j) { T *= cooling; continue; }
-
-      const a = current[i], b = current[j];
-      removeOcc(occ, a); removeOcc(occ, b);
-
-      if (fits(a, b.x, b.y, occ) && fits(b, a.x, a.y, occ)) {
-        const na = {...a, x: b.x, y: b.y}, nb = {...b, x: a.x, y: a.y};
-        const delta = bScore(na) + bScore(nb) - bScore(a) - bScore(b);
-        if (delta < 0 || Math.random() < Math.exp(-delta / T)) {
-          current[i] = na; current[j] = nb;
-          addOcc(occ, na); addOcc(occ, nb);
-          curScore += delta;
-        } else {
-          addOcc(occ, a); addOcc(occ, b);
-        }
-      } else {
-        addOcc(occ, a); addOcc(occ, b);
+      done++;
+      btn.textContent = btn.textContent.replace(/\).*/, '') // keep timer
+        .replace('Optimizing…', `Optimizing… (${done}/${RUNS} done)`);
+      if (done === RUNS) {
+        clearInterval(timer);
+        btn.disabled = false;
+        btn.textContent = 'Plan Redesign →';
+        const metrics = computeMetrics(originalBuildings, bestLayout);
+        showRedesignResultsScreen(originalBuildings, bestLayout, metrics);
+        initializeMetricsPanel(originalBuildings, bestLayout, metrics);
       }
-      T *= cooling;
-    }
-
-    if (curScore < bestScore) { bestScore = curScore; bestLayout = [...fixed, ...current]; }
+    };
+    worker.onerror = err => {
+      console.error('SA worker error:', err);
+      worker.terminate();
+      done++;
+      if (done === RUNS && bestLayout) {
+        clearInterval(timer);
+        btn.disabled = false;
+        btn.textContent = 'Plan Redesign →';
+        const metrics = computeMetrics(originalBuildings, bestLayout);
+        showRedesignResultsScreen(originalBuildings, bestLayout, metrics);
+        initializeMetricsPanel(originalBuildings, bestLayout, metrics);
+      }
+    };
   }
-
-  return bestLayout || [...fixed, ...movable];
 }
 
 function computeMetrics(original, redesigned) {
