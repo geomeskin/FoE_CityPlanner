@@ -1478,13 +1478,21 @@ function onRedesignButtonClick() {
 
   const btn = document.getElementById('redesign-btn');
   btn.disabled = true;
-  btn.textContent = 'Optimizing…';
+
+  const start = Date.now();
+  const timer = setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000);
+    const m = Math.floor(s / 60), sec = s % 60;
+    btn.textContent = `Optimizing… ${m}:${String(sec).padStart(2,'0')}`;
+  }, 1000);
+  btn.textContent = 'Optimizing… 0:00';
 
   const originalBuildings = JSON.parse(JSON.stringify(cityState.buildings));
 
   setTimeout(() => {
     const redesignedBuildings = runSA(originalBuildings, cityState.unlockedAreas, cityState.fixedSet);
     const metrics = computeMetrics(originalBuildings, redesignedBuildings);
+    clearInterval(timer);
     btn.disabled = false;
     btn.textContent = 'Plan Redesign →';
     showRedesignResultsScreen(originalBuildings, redesignedBuildings, metrics);
