@@ -1897,16 +1897,19 @@ function redrawRedesignCanvas() {
     });
   }
   
-  // Calculate canvas size from unlocked area bounds only (exclude off-site buildings)
-  let maxX = 0, maxY = 0;
+  // Tight bounds: crop canvas to unlocked area only
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const a of cityState.unlockedAreas) {
-    maxX = Math.max(maxX, (a.x ?? 0) + (a.width  || 0));
-    maxY = Math.max(maxY, (a.y ?? 0) + (a.length || 0));
+    const ax = a.x ?? 0, ay = a.y ?? 0;
+    minX = Math.min(minX, ax);             minY = Math.min(minY, ay);
+    maxX = Math.max(maxX, ax + (a.width  || 0));
+    maxY = Math.max(maxY, ay + (a.length || 0));
   }
-  
-  const canvasW = AXIS_W + maxX * CELL + PAD * 2;
-  const canvasH = AXIS_H + maxY * CELL + PAD * 2;
-  
+  const cols = maxX - minX, rows = maxY - minY;
+
+  const canvasW = AXIS_W + cols * CELL + 2;
+  const canvasH = AXIS_H + rows * CELL + 2;
+
   // Set canvas size with scaling
   const fitScale = Math.min((container.clientWidth - 4) / canvasW, (container.clientHeight - 4) / canvasH);
   const scale = (phase3State.zoom || 1) * fitScale;
@@ -1915,49 +1918,57 @@ function redrawRedesignCanvas() {
   canvas.height = canvasH * scale;
 
   ctx.scale(scale, scale);
-  
-  // Build unlocked bitmap for background
+
+  // Build unlocked cell set (world coords)
   const unlockedCells = new Set();
   for (const a of cityState.unlockedAreas) {
     const ax = a.x ?? 0, ay = a.y ?? 0;
     for (let dy = 0; dy < (a.length || 0); dy++)
       for (let dx = 0; dx < (a.width || 0); dx++)
-        unlockedCells.add(`${ax + dx},${ay + dy}`);
+        unlockedCells.add(`${ax+dx},${ay+dy}`);
   }
 
-  // Draw cell background (unlocked = tan, locked = dark)
-  for (let gy = 0; gy < maxY; gy++) {
-    for (let gx = 0; gx < maxX; gx++) {
-      ctx.fillStyle = unlockedCells.has(`${gx},${gy}`) ? '#b89a5e' : '#1e3248';
-      ctx.fillRect(AXIS_W + gx * CELL, AXIS_H + gy * CELL, CELL, CELL);
+  // Helper: world → canvas pixel
+  function cx(worldX) { return AXIS_W + (worldX - minX) * CELL; }
+  function cy(worldY) { return AXIS_H + (worldY - minY) * CELL; }
+
+  // Draw cell background (only unlocked area cells)
+  ctx.fillStyle = '#1e3248';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (unlockedCells.has(`${minX+c},${minY+r}`)) {
+        ctx.fillStyle = '#b89a5e';
+        ctx.fillRect(AXIS_W + c * CELL, AXIS_H + r * CELL, CELL, CELL);
+      }
     }
   }
 
+  // Axis labels
+  ctx.fillStyle = '#8a9ab0'; ctx.font = '9px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let c = 0; c < cols; c += 4)
+    ctx.fillText(minX + c, AXIS_W + c * CELL + CELL / 2, AXIS_H / 2);
+  ctx.textAlign = 'right';
+  for (let r = 0; r < rows; r += 4)
+    ctx.fillText(minY + r, AXIS_W - 3, AXIS_H + r * CELL + CELL / 2);
+
   // Grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i <= maxX; i++) {
-    ctx.beginPath();
-    ctx.moveTo(AXIS_W + i * CELL, AXIS_H);
-    ctx.lineTo(AXIS_W + i * CELL, AXIS_H + maxY * CELL);
-    ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= cols; i++) {
+    ctx.beginPath(); ctx.moveTo(AXIS_W + i * CELL, AXIS_H); ctx.lineTo(AXIS_W + i * CELL, AXIS_H + rows * CELL); ctx.stroke();
   }
-  for (let i = 0; i <= maxY; i++) {
-    ctx.beginPath();
-    ctx.moveTo(AXIS_W, AXIS_H + i * CELL);
-    ctx.lineTo(AXIS_W + maxX * CELL, AXIS_H + i * CELL);
-    ctx.stroke();
+  for (let i = 0; i <= rows; i++) {
+    ctx.beginPath(); ctx.moveTo(AXIS_W, AXIS_H + i * CELL); ctx.lineTo(AXIS_W + cols * CELL, AXIS_H + i * CELL); ctx.stroke();
   }
-  
+
   // Draw generated roads (redesigned tab only)
   if (phase3State.currentTab === 'redesigned' && phase3State.generatedRoads) {
     ctx.fillStyle = '#111111';
-    for (const r of phase3State.generatedRoads) {
-      ctx.fillRect(AXIS_W + r.x * CELL, AXIS_H + r.y * CELL, CELL, CELL);
-    }
+    for (const r of phase3State.generatedRoads)
+      ctx.fillRect(cx(r.x), cy(r.y), CELL, CELL);
   }
 
-  // Draw buildings (skip off-site buildings — Friends Tavern, outposts, etc.)
+  // Draw buildings (skip off-site buildings)
   buildings.forEach(b => {
     let onsite = false;
     for (let dy = 0; dy < b.l && !onsite; dy++)
@@ -1965,8 +1976,7 @@ function redrawRedesignCanvas() {
         if (unlockedCells.has(`${b.x+dx},${b.y+dy}`)) onsite = true;
     if (!onsite) return;
 
-    const x = AXIS_W + b.x * CELL;
-    const y = AXIS_H + b.y * CELL;
+    const x = cx(b.x), y = cy(b.y);
     const w = b.w * CELL;
     const h = b.l * CELL;
     
@@ -2079,18 +2089,25 @@ function getBuildingUnderMouse(e) {
  */
 function getGridCellUnderMouse(e) {
   const canvas = document.getElementById('redesign-canvas');
-  const container = document.getElementById('redesign-canvas-container');
   const rect = canvas.getBoundingClientRect();
-  
+
   const x = (e.clientX - rect.left) / canvas.clientWidth * canvas.width;
-  const y = (e.clientY - rect.top) / canvas.clientHeight * canvas.height;
-  
+  const y = (e.clientY - rect.top)  / canvas.clientHeight * canvas.height;
+
   if (x < AXIS_W || y < AXIS_H) return null;
-  
-  const gridX = Math.floor((x - AXIS_W) / CELL);
-  const gridY = Math.floor((y - AXIS_H) / CELL);
-  
-  return { x: gridX, y: gridY };
+
+  // Offset to world coordinates (canvas is cropped to unlocked area)
+  let minX = Infinity, minY = Infinity;
+  for (const a of cityState.unlockedAreas) {
+    minX = Math.min(minX, a.x ?? 0);
+    minY = Math.min(minY, a.y ?? 0);
+  }
+  if (!isFinite(minX)) { minX = 0; minY = 0; }
+
+  return {
+    x: Math.floor((x - AXIS_W) / CELL) + minX,
+    y: Math.floor((y - AXIS_H) / CELL) + minY,
+  };
 }
 
 /**
