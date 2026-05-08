@@ -1240,8 +1240,15 @@ function drawCanvas() {
     }
   }
 
-  // Buildings (base layer, includes GBs at their color)
+  // Buildings (base layer, includes GBs at their color) — skip off-site buildings
   for (const b of buildings) {
+    let onsite = false;
+    for (let dy = 0; dy < b.l && !onsite; dy++)
+      for (let dx = 0; dx < b.w && !onsite; dx++) {
+        const cx = b.x + dx - gridX0, cy = b.y + dy - gridY0;
+        if (cx >= 0 && cy >= 0 && cx < cols && cy < rows && unlocked[cy * cols + cx]) onsite = true;
+      }
+    if (!onsite) continue;
     const px = AXIS_W + (b.x - gridX0) * CELL, py = AXIS_H + (b.y - gridY0) * CELL;
     const pw = b.w * CELL, ph = b.l * CELL;
     if (px + pw <= AXIS_W || py + ph <= AXIS_H ||
@@ -1890,9 +1897,12 @@ function redrawRedesignCanvas() {
     });
   }
   
-  // Calculate canvas size
-  const maxX = Math.max(...buildings.map(b => b.x + b.w), ...phase3State.originalBuildings.map(b => b.x + b.w));
-  const maxY = Math.max(...buildings.map(b => b.y + b.l), ...phase3State.originalBuildings.map(b => b.y + b.l));
+  // Calculate canvas size from unlocked area bounds only (exclude off-site buildings)
+  let maxX = 0, maxY = 0;
+  for (const a of cityState.unlockedAreas) {
+    maxX = Math.max(maxX, (a.x ?? 0) + (a.width  || 0));
+    maxY = Math.max(maxY, (a.y ?? 0) + (a.length || 0));
+  }
   
   const canvasW = AXIS_W + maxX * CELL + PAD * 2;
   const canvasH = AXIS_H + maxY * CELL + PAD * 2;
