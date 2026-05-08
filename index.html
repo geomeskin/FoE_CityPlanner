@@ -1629,15 +1629,19 @@ function generateRoads(buildings, unlockedAreas) {
       if (unlocked.has(k) && !occupied.has(k)) roadCells.add(k);
     }
 
-  // Perimeter cells of a building (adjacent, non-interior, unlocked, unoccupied)
+  // Orthogonal perimeter cells only — diagonal corners don't count as road adjacency in FoE
   function getPerim(b) {
     const perim = new Set();
-    for (let dy = -1; dy <= b.l; dy++)
-      for (let dx = -1; dx <= b.w; dx++) {
-        if (dy >= 0 && dy < b.l && dx >= 0 && dx < b.w) continue;
-        const k = `${b.x+dx},${b.y+dy}`;
-        if (unlocked.has(k) && !occupied.has(k)) perim.add(k);
-      }
+    for (let dx = 0; dx < b.w; dx++) {
+      const top = `${b.x+dx},${b.y-1}`,    bot = `${b.x+dx},${b.y+b.l}`;
+      if (unlocked.has(top) && !occupied.has(top)) perim.add(top);
+      if (unlocked.has(bot) && !occupied.has(bot)) perim.add(bot);
+    }
+    for (let dy = 0; dy < b.l; dy++) {
+      const lft = `${b.x-1},${b.y+dy}`,    rgt = `${b.x+b.w},${b.y+dy}`;
+      if (unlocked.has(lft) && !occupied.has(lft)) perim.add(lft);
+      if (unlocked.has(rgt) && !occupied.has(rgt)) perim.add(rgt);
+    }
     return perim;
   }
 
