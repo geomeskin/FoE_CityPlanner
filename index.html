@@ -1509,7 +1509,7 @@ self.onmessage = function(e) {
   console.log('[SA worker] unlocked:'+unlocked.size+' fixed:'+fixed.length+' movable:'+movable.length);
   const townHall = fixed.find(b=>b.type==='main_building');
   const thCx = townHall ? townHall.x+townHall.w/2 : 0, thCy = townHall ? townHall.y+townHall.l/2 : 0;
-  function bScore(b) { const d=Math.abs(b.x+b.w/2-thCx)+Math.abs(b.y+b.l/2-thCy); return b.road?d*2:d; }
+  function bScore(b) { const d=Math.abs(b.x+b.w/2-thCx)+Math.abs(b.y+b.l/2-thCy); return b.road?d*Math.sqrt(b.w*b.l)*2:d; }
   function addOcc(occ,b)    { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.add((b.x+dx)+','+(b.y+dy)); }
   function removeOcc(occ,b) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.delete((b.x+dx)+','+(b.y+dy)); }
   function fits(b,x,y,occ)  { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) { const k=(x+dx)+','+(y+dy); if(!unlocked.has(k)||occ.has(k)) return false; } return true; }
@@ -1599,16 +1599,7 @@ function generateRoads(buildings, unlockedAreas) {
   const townHall = buildings.find(b => b.type === 'main_building');
   if (!townHall) return [];
 
-  // Road frontier starts at town hall perimeter
-  const roadCells = new Set();
-  for (let dy = -1; dy <= townHall.l; dy++)
-    for (let dx = -1; dx <= townHall.w; dx++) {
-      if (dy >= 0 && dy < townHall.l && dx >= 0 && dx < townHall.w) continue;
-      const k = `${townHall.x+dx},${townHall.y+dy}`;
-      if (unlocked.has(k)) roadCells.add(k);
-    }
-
-  // Building footprint set (to avoid placing roads inside buildings)
+  // Building interiors — roads cannot pass through these
   const occupied = new Set();
   for (const b of buildings)
     for (let dy = 0; dy < b.l; dy++)
@@ -1617,41 +1608,79 @@ function generateRoads(buildings, unlockedAreas) {
 
   const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
 
-  function bfsConnect(startCells) {
-    // BFS from startCells until we hit a road cell; return path cells
-    const queue = [...startCells].map(k => ({ k, path: [k] }));
-    const visited = new Set(startCells);
-    while (queue.length) {
-      const { k, path } = queue.shift();
-      if (roadCells.has(k)) return path;
-      const [x, y] = k.split(',').map(Number);
-      for (const [dx, dy] of dirs) {
-        const nk = `${x+dx},${y+dy}`;
-        if (!visited.has(nk) && unlocked.has(nk) && !occupied.has(nk)) {
-          visited.add(nk);
-          queue.push({ k: nk, path: [...path, nk] });
-        }
-      }
+  // Road network seeds from town hall perimeter
+  const roadCells = new Set();
+  for (let dy = -1; dy <= townHall.l; dy++)
+    for (let dx = -1; dx <= townHall.w; dx++) {
+      if (dy >= 0 && dy < townHall.l && dx >= 0 && dx < townHall.w) continue;
+      const k = `${townHall.x+dx},${townHall.y+dy}`;
+      if (unlocked.has(k) && !occupied.has(k)) roadCells.add(k);
     }
-    return [];
-  }
 
-  // Connect each road-requiring building to the frontier
-  const roadBuildings = buildings.filter(b => b.road && b.type !== 'main_building');
-  for (const b of roadBuildings) {
-    // Collect perimeter cells of this building
-    const perim = [];
+  // Perimeter cells of a building (adjacent, non-interior, unlocked, unoccupied)
+  function getPerim(b) {
+    const perim = new Set();
     for (let dy = -1; dy <= b.l; dy++)
       for (let dx = -1; dx <= b.w; dx++) {
         if (dy >= 0 && dy < b.l && dx >= 0 && dx < b.w) continue;
         const k = `${b.x+dx},${b.y+dy}`;
-        if (unlocked.has(k) && !occupied.has(k)) perim.push(k);
+        if (unlocked.has(k) && !occupied.has(k)) perim.add(k);
       }
-    if (!perim.length) continue;
-    // If already adjacent to a road cell, skip
-    if (perim.some(k => roadCells.has(k))) continue;
-    const path = bfsConnect(perim);
-    for (const k of path) roadCells.add(k);
+    return perim;
+  }
+
+  // Steiner tree heuristic (Prim's-like nearest-first):
+  // Always connect the road-requiring building closest to the existing road network.
+  // This naturally creates shared trunk roads rather than 66 separate paths.
+  // Sort largest first so equal-distance buildings prefer larger ones.
+  let remaining = buildings
+    .filter(b => b.road && b.type !== 'main_building')
+    .sort((a, b) => (b.w * b.l) - (a.w * a.l))
+    .map(b => ({ b, perim: getPerim(b) }))
+    .filter(({ perim }) => perim.size > 0);
+
+  while (remaining.length > 0) {
+    // Drop buildings whose perimeter already touches the road network
+    remaining = remaining.filter(({ perim }) => {
+      for (const k of perim) if (roadCells.has(k)) return false;
+      return true;
+    });
+    if (!remaining.length) break;
+
+    // Map perimeter cell → index in remaining (first seen wins = largest first)
+    const perimMap = new Map();
+    for (let i = 0; i < remaining.length; i++)
+      for (const k of remaining[i].perim)
+        if (!perimMap.has(k)) perimMap.set(k, i);
+
+    // Multi-source BFS outward from the entire road network
+    const queue = [];
+    const prev = new Map();
+    const visited = new Set();
+    for (const k of roadCells) { queue.push(k); visited.add(k); prev.set(k, null); }
+
+    let foundIdx = -1, foundCell = null, qi = 0;
+    outer:
+    while (qi < queue.length) {
+      const k = queue[qi++];
+      const [x, y] = k.split(',').map(Number);
+      for (const [ddx, ddy] of dirs) {
+        const nk = `${x+ddx},${y+ddy}`;
+        if (visited.has(nk) || !unlocked.has(nk) || occupied.has(nk)) continue;
+        visited.add(nk);
+        prev.set(nk, k);
+        if (perimMap.has(nk)) { foundIdx = perimMap.get(nk); foundCell = nk; break outer; }
+        queue.push(nk);
+      }
+    }
+
+    if (foundIdx === -1) break; // No reachable buildings remain
+
+    // Trace corridor from found perimeter cell back to road network
+    let cur = foundCell;
+    while (cur !== null && !roadCells.has(cur)) { roadCells.add(cur); cur = prev.get(cur); }
+
+    remaining.splice(foundIdx, 1);
   }
 
   return [...roadCells].map(k => {
