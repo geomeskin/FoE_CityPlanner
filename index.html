@@ -1835,7 +1835,8 @@ function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metri
   };
 
   document.getElementById('redesign-save-btn').onclick = () => {
-    const name = prompt('Save this redesign as:', `Redesign ${new Date().toLocaleTimeString()}`);
+    const base = cityState.filename || `Player ${cityState.playerId}`;
+    const name = prompt('Save this redesign as:', `${base} — Redesign ${new Date().toLocaleTimeString()}`);
     if (name) dbSaveCity(name).then(() => { refreshSavedList(); alert('Saved!'); });
   };
 
