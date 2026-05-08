@@ -1,19 +1,32 @@
-SESSION HANDOFF — 2026-04-30
+SESSION HANDOFF — 2026-05-07
 =============================
 
-WHAT WAS FIXED THIS SESSION
+WHAT WAS DONE THIS SESSION
 -----------------------------
-1. Replaced mock optimizer (random ±8 displacement) with runPacker() — real no-overlap
-   first-fit-decreasing packer using the actual UnlockedAreas grid as the boundary.
-2. Wired onRedesignButtonClick → showRedesignResultsScreen so the redesign canvas
-   actually appears when you click "Plan Redesign".
-3. Fixed redrawRedesignCanvas to draw the real unlocked/locked cell background
-   (tan = unlocked, dark blue = locked) instead of a black void.
+1. Deployed to GitHub Pages — live at https://geomeskin.github.io/FoE_CityPlanner/
+2. Fixed null element crash on city import (missing id="fixed-summary")
+3. Replaced mock packer with Simulated Annealing optimizer:
+   - 6 independent runs x 5000 iterations each
+   - Each run starts from a random shuffle of movable buildings
+   - Score = Manhattan distance to town hall (road buildings 2x weight)
+   - Move = swap two random movable buildings if both positions valid
+   - Keeps best result across all 6 runs
+4. Off-site buildings (Friends Tavern, outposts) excluded from packing
+5. Added "Back to City" button on redesign results screen
+6. Roads changed to black (#111111)
+7. Building borders made visible (dark 1px stroke) on both canvases
+8. Stats bar added below legend (Buildings, GBs, Unlocked Cells, Need Road, Road-Free, Road Segments)
+9. Per-cell borders on unlocked area cells for easy space counting
+10. Filename/Player ID displayed in toolbar after city load
+11. Save/Load city versions via IndexedDB (survives page reloads)
+12. Export saved city as JSON file (for cross-device transfer)
+13. Import saved city JSON file back into IndexedDB
+14. Elapsed timer on "Plan Redesign" button (shows 0:00 counting up)
 
 WHAT STILL NEEDS DOING (in order)
 ------------------------------------
-1. ROAD GENERATION — biggest remaining gap.
-   After packing, there is no road network drawn on the redesigned canvas.
+1. ROAD GENERATION — still the biggest gap in the redesign output.
+   The SA optimizer scores by distance to town hall but draws NO roads.
    Algorithm to build:
      a) Find town hall (type === 'main_building')
      b) Start with its perimeter cells as the "road frontier"
@@ -21,32 +34,35 @@ WHAT STILL NEEDS DOING (in order)
         outward until hitting the frontier, then add those path cells as roads
      d) Newly added road cells join the frontier for subsequent buildings
      e) Return array of {x, y, w:1, l:1} road tiles
-   Wire result into redrawRedesignCanvas (draw roads before buildings, same style
-   as drawCanvas: '#4a5560' for 1×1 cobblestone).
+   Wire result into redrawRedesignCanvas (draw roads before buildings, black)
 
-2. SPACE SLIDER — currently reads sl-space but value is unused in runPacker.
-   Idea: when space weight is high, after packing run a compaction pass that
-   tries to shift each building toward the town hall one step at a time.
+2. SA TUNING — need to observe actual run times and result quality.
+   Currently: 6 runs x 5000 iterations. Previous session had ~10 min runs.
+   May need to increase iterations or adjust T0/T_MIN/cooling schedule.
+   Road tile count should replace/augment distance score once road gen is built.
 
-3. MULTIPLE SA RESTARTS — run the packer + a simulated annealing shuffle N times,
-   keep the layout with the best score (fewest road tiles + most compact).
-   SA move: swap two movable buildings' positions. Score: road tile count.
+3. SPACE SLIDER — sl-space value is still unused in runSA.
+   Idea: weight compactness score by slider value.
 
-4. SET DETECTION — colored dots on buildings that belong to the same named set
-   (e.g. "Shrines of Knowledge"). Buildings sharing a name prefix group into sets.
-   Show a colored dot per set in the top-left corner of each building tile.
+4. SET DETECTION — colored dots on buildings belonging to the same named set.
 
 KEY FILE / LINE REFERENCES
 -----------------------------
-- index.html ~1267  onRedesignButtonClick()  — entry point for redesign
-- index.html ~1292  runPacker()              — the new packer (replace/extend here)
-- index.html ~1440  redrawRedesignCanvas()   — add road drawing here (before buildings)
-- redesign-output.js initializeMetricsPanel() — metrics side panel (works fine)
+- index.html ~1476  onRedesignButtonClick() — entry point, has elapsed timer
+- index.html ~1495  runSA()                 — SA optimizer (replace/extend here)
+- index.html ~1580  redrawRedesignCanvas()  — add road drawing here (before buildings)
+- redesign-output.js initializeMetricsPanel() — metrics side panel
 
 DATA SHAPES
 ------------
-- cityState.buildings   [{type, name, x, y, w, l, road}]  road=true → needs adjacency
-- cityState.unlockedAreas [{x, y, width, length}]          some omit y → treat as 0
-- cityState.fixedSet    Set of "x,y" strings
-- cityState.roads       [{x, y, w, l}]                     original road tiles (reference)
-- Town hall:            b.type === 'main_building'
+- cityState.buildings    [{type, name, x, y, w, l, road}]  road=true → needs adjacency
+- cityState.unlockedAreas [{x, y, width, length}]           some omit y → treat as 0
+- cityState.fixedSet     Set of "x,y" strings
+- cityState.roads        [{x, y, w, l}]                     original road tiles
+- Town hall:             b.type === 'main_building'
+
+GITHUB
+-------
+- Repo:  https://github.com/geomeskin/FoE_CityPlanner
+- Live:  https://geomeskin.github.io/FoE_CityPlanner/
+- Branch: main (GitHub Pages serves from main / root)
