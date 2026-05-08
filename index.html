@@ -1513,18 +1513,9 @@ self.onmessage = function(e) {
   function addOcc(occ,b)    { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.add((b.x+dx)+','+(b.y+dy)); }
   function removeOcc(occ,b) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.delete((b.x+dx)+','+(b.y+dy)); }
   function fits(b,x,y,occ)  { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) { const k=(x+dx)+','+(y+dy); if(!unlocked.has(k)||occ.has(k)) return false; } return true; }
-  function randomPlace() {
-    const shuffled=[...movable].sort(()=>Math.random()-0.5), occ=new Set(), placed=[];
-    for(const b of fixed) addOcc(occ,b);
-    for(const b of shuffled) {
-      let found=false;
-      outer: for(let y=minY;y<=maxY-b.l+1;y++) for(let x=minX;x<=maxX-b.w+1;x++) if(fits(b,x,y,occ)){const pb={...b,x,y};addOcc(occ,pb);placed.push(pb);found=true;break outer;}
-      if(!found) { placed.push({...b}); addOcc(occ,b); }
-    }
-    return placed;
-  }
+  // Start from original positions (guaranteed no overlaps)
   const endTime = Date.now() + runMs;
-  let current=randomPlace(), occ=new Set(), curScore=0, T=T0, iters=0;
+  let current=[...movable].map(b=>({...b})), occ=new Set(), curScore=0, T=T0, iters=0;
   for(const b of fixed)   addOcc(occ,b);
   for(const b of current) addOcc(occ,b);
   curScore=current.reduce((s,b)=>s+bScore(b),0);
