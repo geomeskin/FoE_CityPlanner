@@ -1525,8 +1525,9 @@ self.onmessage = function(e) {
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   for (const k of unlocked) { const [x,y]=k.split(',').map(Number); if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y; }
   function isOnsite(b) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) if(unlocked.has((b.x+dx)+','+(b.y+dy))) return true; return false; }
-  const fixed   = buildings.filter(b => fixedSet.has(buildingKey(b)) || b.type==='main_building' || !isOnsite(b));
-  const movable = buildings.filter(b => !fixedSet.has(buildingKey(b)) && b.type!=='main_building' && isOnsite(b));
+  const AUTO_FIXED = new Set(['main_building','greatbuilding','friends_tavern','outpost_ship','hub_main','hub_part']);
+  const fixed   = buildings.filter(b => fixedSet.has(buildingKey(b)) || AUTO_FIXED.has(b.type) || !isOnsite(b));
+  const movable = buildings.filter(b => !fixedSet.has(buildingKey(b)) && !AUTO_FIXED.has(b.type) && isOnsite(b));
   console.log('[SA worker] unlocked:'+unlocked.size+' fixed:'+fixed.length+' movable:'+movable.length+' reserved:'+reserved.size);
   const townHall = fixed.find(b=>b.type==='main_building');
   const thCx = townHall ? townHall.x+townHall.w/2 : 0, thCy = townHall ? townHall.y+townHall.l/2 : 0;
