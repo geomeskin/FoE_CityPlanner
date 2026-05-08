@@ -1513,6 +1513,15 @@ self.onmessage = function(e) {
   function addOcc(occ,b)    { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.add((b.x+dx)+','+(b.y+dy)); }
   function removeOcc(occ,b) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.delete((b.x+dx)+','+(b.y+dy)); }
   function fits(b,x,y,occ)  { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) { const k=(x+dx)+','+(y+dy); if(!unlocked.has(k)||occ.has(k)) return false; } return true; }
+  // Road buildings must keep at least one free adjacent cell so corridors can be routed
+  function hasRoadAccess(b,x,y,occ) {
+    for(let dy=-1;dy<=b.l;dy++) for(let dx=-1;dx<=b.w;dx++){
+      if(dy>=0&&dy<b.l&&dx>=0&&dx<b.w) continue;
+      const k=(x+dx)+','+(y+dy);
+      if(unlocked.has(k)&&!occ.has(k)) return true;
+    }
+    return false;
+  }
   // Start from original positions (guaranteed no overlaps)
   const endTime = Date.now() + runMs;
   let current=[...movable].map(b=>({...b})), occ=new Set(), curScore=0, T=T0, iters=0;
@@ -1528,6 +1537,10 @@ self.onmessage = function(e) {
     removeOcc(occ,a);removeOcc(occ,b);
     if(fits(a,b.x,b.y,occ)&&fits(b,a.x,a.y,occ)){
       const na={...a,x:b.x,y:b.y},nb={...b,x:a.x,y:a.y};
+      // Hard constraint: road buildings must always have road access at new position
+      if((na.road&&!hasRoadAccess(na,na.x,na.y,occ))||(nb.road&&!hasRoadAccess(nb,nb.x,nb.y,occ))){
+        addOcc(occ,a);addOcc(occ,b);T=Math.max(T*0.9999,T_MIN);continue;
+      }
       const delta=bScore(na)+bScore(nb)-bScore(a)-bScore(b);
       if(delta<0||Math.random()<Math.exp(-delta/T)){current[i]=na;current[j]=nb;addOcc(occ,na);addOcc(occ,nb);curScore+=delta;}
       else{addOcc(occ,a);addOcc(occ,b);}
@@ -1565,10 +1578,11 @@ self.onmessage = function(e) {
         clearInterval(timer);
         btn.disabled = false;
         btn.textContent = 'Plan Redesign →';
-        const generatedRoads = generateRoads(bestLayout, cityState.unlockedAreas);
-        const metrics = computeMetrics(originalBuildings, bestLayout);
-        showRedesignResultsScreen(originalBuildings, bestLayout, metrics, generatedRoads);
-        initializeMetricsPanel(originalBuildings, bestLayout, metrics);
+        const cleanLayout = resolveOverlaps(bestLayout, cityState.unlockedAreas);
+        const generatedRoads = generateRoads(cleanLayout, cityState.unlockedAreas);
+        const metrics = computeMetrics(originalBuildings, cleanLayout);
+        showRedesignResultsScreen(originalBuildings, cleanLayout, metrics, generatedRoads);
+        initializeMetricsPanel(originalBuildings, cleanLayout, metrics);
       }
     };
     worker.onerror = err => {
@@ -1687,6 +1701,44 @@ function generateRoads(buildings, unlockedAreas) {
     const [x, y] = k.split(',').map(Number);
     return { x, y, w: 1, l: 1 };
   });
+}
+
+// Post-SA pass: guaranteed overlap-free layout (largest first, find valid slot if needed)
+function resolveOverlaps(layout, unlockedAreas) {
+  const unlocked = new Set();
+  for (const a of unlockedAreas) {
+    const ax = a.x ?? 0, ay = a.y ?? 0;
+    for (let dy = 0; dy < (a.length || 0); dy++)
+      for (let dx = 0; dx < (a.width || 0); dx++)
+        unlocked.add(`${ax+dx},${ay+dy}`);
+  }
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const k of unlocked) { const [x,y]=k.split(',').map(Number); if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y; }
+  function fitsAt(b,x,y,occ) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++){const k=`${x+dx},${y+dy}`;if(!unlocked.has(k)||occ.has(k))return false;} return true; }
+  function mark(b,x,y,occ)   { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.add(`${x+dx},${y+dy}`); }
+
+  // Town hall first, then by size descending, offsite buildings last
+  const sorted = [...layout].sort((a,b) => {
+    if (a.type==='main_building') return -1;
+    if (b.type==='main_building') return 1;
+    const aOnsite = [...Array(a.l)].some((_,dy)=>[...Array(a.w)].some((_,dx)=>unlocked.has(`${a.x+dx},${a.y+dy}`)));
+    const bOnsite = [...Array(b.l)].some((_,dy)=>[...Array(b.w)].some((_,dx)=>unlocked.has(`${b.x+dx},${b.y+dy}`)));
+    if (aOnsite && !bOnsite) return -1;
+    if (!aOnsite && bOnsite) return 1;
+    return (b.w*b.l)-(a.w*a.l);
+  });
+
+  const occ = new Set();
+  const resolved = [];
+  for (const b of sorted) {
+    if (fitsAt(b,b.x,b.y,occ)) { mark(b,b.x,b.y,occ); resolved.push(b); continue; }
+    // Overlap detected — find nearest valid position
+    let placed=false;
+    outer: for(let y=minY;y<=maxY-b.l+1;y++) for(let x=minX;x<=maxX-b.w+1;x++)
+      if(fitsAt(b,x,y,occ)){const nb={...b,x,y};mark(nb,x,y,occ);resolved.push(nb);placed=true;break outer;}
+    if(!placed) resolved.push(b); // offsite or no room — keep original, don't mark
+  }
+  return resolved;
 }
 
 function computeMetrics(original, redesigned) {
