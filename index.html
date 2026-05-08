@@ -1491,10 +1491,18 @@ function onRedesignButtonClick() {
   const fixedSetArr = [...cityState.fixedSet];
   const RUNS = 6, RUN_SECONDS = 60, T0 = 80, T_MIN = 0.5;
 
+  // Reserve original road cells — SA cannot build on these, guaranteeing corridors stay open
+  const reservedArr = [];
+  for (const r of (cityState.roads || []))
+    for (let dy=0; dy<(r.l||1); dy++)
+      for (let dx=0; dx<(r.w||1); dx++)
+        reservedArr.push(`${r.x+dx},${r.y+dy}`);
+
   const workerSrc = `
 self.onmessage = function(e) {
-  const { buildings, unlockedAreas, fixedSetArr, runMs, T0, T_MIN } = e.data;
+  const { buildings, unlockedAreas, fixedSetArr, reservedArr, runMs, T0, T_MIN } = e.data;
   const fixedSet = new Set(fixedSetArr);
+  const reserved = new Set(reservedArr);
   function buildingKey(b) { return b.x+','+b.y; }
   const unlocked = new Set();
   for (const a of unlockedAreas) {
@@ -1506,22 +1514,14 @@ self.onmessage = function(e) {
   function isOnsite(b) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) if(unlocked.has((b.x+dx)+','+(b.y+dy))) return true; return false; }
   const fixed   = buildings.filter(b => fixedSet.has(buildingKey(b)) || b.type==='main_building' || !isOnsite(b));
   const movable = buildings.filter(b => !fixedSet.has(buildingKey(b)) && b.type!=='main_building' && isOnsite(b));
-  console.log('[SA worker] unlocked:'+unlocked.size+' fixed:'+fixed.length+' movable:'+movable.length);
+  console.log('[SA worker] unlocked:'+unlocked.size+' fixed:'+fixed.length+' movable:'+movable.length+' reserved:'+reserved.size);
   const townHall = fixed.find(b=>b.type==='main_building');
   const thCx = townHall ? townHall.x+townHall.w/2 : 0, thCy = townHall ? townHall.y+townHall.l/2 : 0;
   function bScore(b) { const d=Math.abs(b.x+b.w/2-thCx)+Math.abs(b.y+b.l/2-thCy); return b.road?d*Math.sqrt(b.w*b.l)*2:d; }
   function addOcc(occ,b)    { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.add((b.x+dx)+','+(b.y+dy)); }
   function removeOcc(occ,b) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.delete((b.x+dx)+','+(b.y+dy)); }
-  function fits(b,x,y,occ)  { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) { const k=(x+dx)+','+(y+dy); if(!unlocked.has(k)||occ.has(k)) return false; } return true; }
-  // Road buildings must keep at least one free adjacent cell so corridors can be routed
-  function hasRoadAccess(b,x,y,occ) {
-    for(let dy=-1;dy<=b.l;dy++) for(let dx=-1;dx<=b.w;dx++){
-      if(dy>=0&&dy<b.l&&dx>=0&&dx<b.w) continue;
-      const k=(x+dx)+','+(y+dy);
-      if(unlocked.has(k)&&!occ.has(k)) return true;
-    }
-    return false;
-  }
+  // reserved cells are treated as permanently occupied (road corridors)
+  function fits(b,x,y,occ)  { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) { const k=(x+dx)+','+(y+dy); if(!unlocked.has(k)||occ.has(k)||reserved.has(k)) return false; } return true; }
   // Start from original positions (guaranteed no overlaps)
   const endTime = Date.now() + runMs;
   let current=[...movable].map(b=>({...b})), occ=new Set(), curScore=0, T=T0, iters=0;
@@ -1537,10 +1537,6 @@ self.onmessage = function(e) {
     removeOcc(occ,a);removeOcc(occ,b);
     if(fits(a,b.x,b.y,occ)&&fits(b,a.x,a.y,occ)){
       const na={...a,x:b.x,y:b.y},nb={...b,x:a.x,y:a.y};
-      // Hard constraint: road buildings must always have road access at new position
-      if((na.road&&!hasRoadAccess(na,na.x,na.y,occ))||(nb.road&&!hasRoadAccess(nb,nb.x,nb.y,occ))){
-        addOcc(occ,a);addOcc(occ,b);T=Math.max(T*0.9999,T_MIN);continue;
-      }
       const delta=bScore(na)+bScore(nb)-bScore(a)-bScore(b);
       if(delta<0||Math.random()<Math.exp(-delta/T)){current[i]=na;current[j]=nb;addOcc(occ,na);addOcc(occ,nb);curScore+=delta;}
       else{addOcc(occ,a);addOcc(occ,b);}
@@ -1561,6 +1557,7 @@ self.onmessage = function(e) {
       buildings: originalBuildings,
       unlockedAreas: cityState.unlockedAreas,
       fixedSetArr,
+      reservedArr,
       runMs: RUN_SECONDS * 1000,
       T0, T_MIN,
     });
@@ -1578,7 +1575,8 @@ self.onmessage = function(e) {
         clearInterval(timer);
         btn.disabled = false;
         btn.textContent = 'Plan Redesign →';
-        const cleanLayout = resolveOverlaps(bestLayout, cityState.unlockedAreas);
+        const reserved = new Set(reservedArr);
+        const cleanLayout = resolveOverlaps(bestLayout, cityState.unlockedAreas, reserved);
         const generatedRoads = generateRoads(cleanLayout, cityState.unlockedAreas);
         const metrics = computeMetrics(originalBuildings, cleanLayout);
         showRedesignResultsScreen(originalBuildings, cleanLayout, metrics, generatedRoads);
@@ -1704,7 +1702,7 @@ function generateRoads(buildings, unlockedAreas) {
 }
 
 // Post-SA pass: guaranteed overlap-free layout (largest first, find valid slot if needed)
-function resolveOverlaps(layout, unlockedAreas) {
+function resolveOverlaps(layout, unlockedAreas, reserved) {
   const unlocked = new Set();
   for (const a of unlockedAreas) {
     const ax = a.x ?? 0, ay = a.y ?? 0;
@@ -1714,7 +1712,7 @@ function resolveOverlaps(layout, unlockedAreas) {
   }
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   for (const k of unlocked) { const [x,y]=k.split(',').map(Number); if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y; }
-  function fitsAt(b,x,y,occ) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++){const k=`${x+dx},${y+dy}`;if(!unlocked.has(k)||occ.has(k))return false;} return true; }
+  function fitsAt(b,x,y,occ) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++){const k=`${x+dx},${y+dy}`;if(!unlocked.has(k)||occ.has(k)||(reserved&&reserved.has(k)))return false;} return true; }
   function mark(b,x,y,occ)   { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.add(`${x+dx},${y+dy}`); }
 
   // Town hall first, then by size descending, offsite buildings last
