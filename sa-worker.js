@@ -30,6 +30,7 @@ self.onmessage = function (e) {
   const fixed   = buildings.filter(b => fixedSet.has(buildingKey(b)) || b.type === 'main_building' || !isOnsite(b));
   const movable = buildings.filter(b => !fixedSet.has(buildingKey(b)) && b.type !== 'main_building' && isOnsite(b));
 
+  console.log(`[SA worker] unlocked cells: ${unlocked.size}, fixed: ${fixed.length}, movable: ${movable.length}`);
   const townHall = fixed.find(b => b.type === 'main_building');
   const thCx = townHall ? townHall.x + townHall.w / 2 : 0;
   const thCy = townHall ? townHall.y + townHall.l / 2 : 0;
