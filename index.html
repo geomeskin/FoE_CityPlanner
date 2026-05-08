@@ -1489,11 +1489,11 @@ function onRedesignButtonClick() {
 
   const originalBuildings = JSON.parse(JSON.stringify(cityState.buildings));
   const fixedSetArr = [...cityState.fixedSet];
-  const RUNS = 6, MAX_ITER = 100000, T0 = 80, T_MIN = 0.5;
+  const RUNS = 6, RUN_SECONDS = 60, T0 = 80, T_MIN = 0.5;
 
   const workerSrc = `
 self.onmessage = function(e) {
-  const { buildings, unlockedAreas, fixedSetArr, maxIter, T0, T_MIN } = e.data;
+  const { buildings, unlockedAreas, fixedSetArr, runMs, T0, T_MIN } = e.data;
   const fixedSet = new Set(fixedSetArr);
   function buildingKey(b) { return b.x+','+b.y; }
   const unlocked = new Set();
@@ -1523,14 +1523,16 @@ self.onmessage = function(e) {
     }
     return placed;
   }
-  const cooling=Math.pow(T_MIN/T0,1/maxIter);
-  let current=randomPlace(), occ=new Set(), curScore=0, T=T0;
+  const endTime = Date.now() + runMs;
+  let current=randomPlace(), occ=new Set(), curScore=0, T=T0, iters=0;
   for(const b of fixed)   addOcc(occ,b);
   for(const b of current) addOcc(occ,b);
   curScore=current.reduce((s,b)=>s+bScore(b),0);
-  for(let iter=0;iter<maxIter;iter++){
+  while(true){
+    if(iters % 2000 === 0 && Date.now() >= endTime) break;
+    iters++;
     const i=Math.floor(Math.random()*current.length), j=Math.floor(Math.random()*current.length);
-    if(i===j){T*=cooling;continue;}
+    if(i===j){ T=Math.max(T*0.9999,T_MIN); continue; }
     const a=current[i],b=current[j];
     removeOcc(occ,a);removeOcc(occ,b);
     if(fits(a,b.x,b.y,occ)&&fits(b,a.x,a.y,occ)){
@@ -1539,8 +1541,9 @@ self.onmessage = function(e) {
       if(delta<0||Math.random()<Math.exp(-delta/T)){current[i]=na;current[j]=nb;addOcc(occ,na);addOcc(occ,nb);curScore+=delta;}
       else{addOcc(occ,a);addOcc(occ,b);}
     } else{addOcc(occ,a);addOcc(occ,b);}
-    T*=cooling;
+    T=Math.max(T*0.9999,T_MIN);
   }
+  console.log('[SA worker] done — iters:'+iters+' score:'+Math.round(curScore)+' movable:'+movable.length);
   self.postMessage({layout:[...fixed,...current],score:curScore});
 };`;
   const workerBlob = new Blob([workerSrc], { type: 'application/javascript' });
@@ -1554,7 +1557,7 @@ self.onmessage = function(e) {
       buildings: originalBuildings,
       unlockedAreas: cityState.unlockedAreas,
       fixedSetArr,
-      maxIter: MAX_ITER,
+      runMs: RUN_SECONDS * 1000,
       T0, T_MIN,
     });
     worker.onmessage = e => {
