@@ -1494,7 +1494,7 @@ function onRedesignButtonClick() {
   let bestLayout = null, bestScore = Infinity, done = 0;
 
   for (let i = 0; i < RUNS; i++) {
-    const worker = new Worker('sa-worker.js');
+    const worker = new Worker('sa-worker.js?v=2');
     worker.postMessage({
       buildings: originalBuildings,
       unlockedAreas: cityState.unlockedAreas,
