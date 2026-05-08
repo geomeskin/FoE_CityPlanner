@@ -2012,17 +2012,31 @@ function setupRedesignCanvasListeners() {
   });
   
   canvas.addEventListener('mousemove', (e) => {
+    const tooltip = document.getElementById('tooltip');
     if (!phase3State.draggedBuilding) {
-      // Update cursor based on hover
       const building = getBuildingUnderMouse(e);
-      if (phase3State.currentTab === 'redesigned' && building) {
-        canvas.style.cursor = 'grab';
+      canvas.style.cursor = (phase3State.currentTab === 'redesigned' && building) ? 'grab' : 'crosshair';
+
+      // Show tooltip
+      if (building) {
+        const lbl = TYPE_LABELS[building.type] || building.type;
+        const roadTag = building.road
+          ? ' &nbsp;<span style="color:#ff8800">&#128739; Road needed</span>'
+          : ' &nbsp;<span style="color:#88cc88">&#10004; No road</span>';
+        tooltip.innerHTML =
+          `<strong>${esc(building.name)}</strong>` +
+          `${esc(lbl)} &nbsp;|&nbsp; ${building.w}\xD7${building.l} &nbsp;|&nbsp; (${building.x}, ${building.y})${roadTag}`;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top  = (e.clientY - 10) + 'px';
       } else {
-        canvas.style.cursor = 'crosshair';
+        tooltip.style.display = 'none';
       }
       return;
     }
-    
+
+    if (tooltip) tooltip.style.display = 'none';
+
     // Update dragged building position
     const gridPos = getGridCellUnderMouse(e);
     if (gridPos) {
@@ -2030,6 +2044,10 @@ function setupRedesignCanvasListeners() {
       phase3State.draggedBuilding.y = gridPos.y;
       redrawRedesignCanvas();
     }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    document.getElementById('tooltip').style.display = 'none';
   });
   
   canvas.addEventListener('mouseup', (e) => {
