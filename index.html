@@ -1917,6 +1917,9 @@ function redrawRedesignCanvas() {
 
   canvas.width  = canvasW * scale;
   canvas.height = canvasH * scale;
+  phase3State.canvasScale = scale;
+  phase3State.canvasMinX  = minX;
+  phase3State.canvasMinY  = minY;
 
   ctx.scale(scale, scale);
 
@@ -2110,18 +2113,15 @@ function getGridCellUnderMouse(e) {
   const canvas = document.getElementById('redesign-canvas');
   const rect = canvas.getBoundingClientRect();
 
-  const x = (e.clientX - rect.left) / canvas.clientWidth * canvas.width;
-  const y = (e.clientY - rect.top)  / canvas.clientHeight * canvas.height;
+  // Convert CSS mouse position to pre-scale canvas coordinates
+  const scale = phase3State.canvasScale || 1;
+  const x = (e.clientX - rect.left) / scale;
+  const y = (e.clientY - rect.top)  / scale;
 
   if (x < AXIS_W || y < AXIS_H) return null;
 
-  // Offset to world coordinates (canvas is cropped to unlocked area)
-  let minX = Infinity, minY = Infinity;
-  for (const a of cityState.unlockedAreas) {
-    minX = Math.min(minX, a.x ?? 0);
-    minY = Math.min(minY, a.y ?? 0);
-  }
-  if (!isFinite(minX)) { minX = 0; minY = 0; }
+  const minX = phase3State.canvasMinX ?? 0;
+  const minY = phase3State.canvasMinY ?? 0;
 
   return {
     x: Math.floor((x - AXIS_W) / CELL) + minX,
