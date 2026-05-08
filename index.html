@@ -775,7 +775,7 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
     
     <!-- Metrics sidebar -->
     <div id="redesign-metrics-panel">
-      <h2>Current Metrics</h2>
+      <h2>Redesign vs Original</h2>
       <div id="redesign-metrics-list"></div>
     </div>
   </div>
@@ -1592,10 +1592,10 @@ self.onmessage = function(e) {
         btn.textContent = 'Plan Redesign →';
         const reserved = new Set(reservedArr);
         const cleanLayout = resolveOverlaps(bestLayout, cityState.unlockedAreas, reserved);
-        const generatedRoads = generateRoads(cleanLayout, cityState.unlockedAreas);
-        const metrics = computeMetrics(originalBuildings, cleanLayout);
-        showRedesignResultsScreen(originalBuildings, cleanLayout, metrics, generatedRoads);
-        initializeMetricsPanel(originalBuildings, cleanLayout, metrics);
+        const accessLayout = ensureRoadAccess(cleanLayout, cityState.unlockedAreas);
+        const generatedRoads = generateRoads(accessLayout, cityState.unlockedAreas);
+        const metrics = computeMetrics(originalBuildings, accessLayout);
+        showRedesignResultsScreen(originalBuildings, accessLayout, metrics, generatedRoads);
       }
     };
     worker.onerror = err => {
@@ -1606,9 +1606,10 @@ self.onmessage = function(e) {
         clearInterval(timer);
         btn.disabled = false;
         btn.textContent = 'Plan Redesign →';
-        const metrics = computeMetrics(originalBuildings, bestLayout);
-        showRedesignResultsScreen(originalBuildings, bestLayout, metrics);
-        initializeMetricsPanel(originalBuildings, bestLayout, metrics);
+        const accessLayout2 = ensureRoadAccess(bestLayout, cityState.unlockedAreas);
+        const generatedRoads2 = generateRoads(accessLayout2, cityState.unlockedAreas);
+        const metrics = computeMetrics(originalBuildings, accessLayout2);
+        showRedesignResultsScreen(originalBuildings, accessLayout2, metrics, generatedRoads2);
       }
     };
   }
@@ -1758,6 +1759,60 @@ function resolveOverlaps(layout, unlockedAreas, reserved) {
   return resolved;
 }
 
+// Post-resolveOverlaps pass: relocate non-road neighbors to open orthogonal access for road-requiring buildings
+function ensureRoadAccess(layout, unlockedAreas) {
+  const unlocked = new Set();
+  for (const a of unlockedAreas) {
+    const ax = a.x ?? 0, ay = a.y ?? 0;
+    for (let dy = 0; dy < (a.length||0); dy++)
+      for (let dx = 0; dx < (a.width||0); dx++)
+        unlocked.add(`${ax+dx},${ay+dy}`);
+  }
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const k of unlocked) {
+    const [x,y]=k.split(',').map(Number);
+    if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y;
+  }
+  function rebuildCM(bs) {
+    const m=new Map();
+    bs.forEach((b,i)=>{for(let dy=0;dy<b.l;dy++)for(let dx=0;dx<b.w;dx++)m.set(`${b.x+dx},${b.y+dy}`,i);});
+    return m;
+  }
+  function freePerim(b,cm) {
+    const f=[];
+    for(let dx=0;dx<b.w;dx++){for(const k of[`${b.x+dx},${b.y-1}`,`${b.x+dx},${b.y+b.l}`])if(unlocked.has(k)&&!cm.has(k))f.push(k);}
+    for(let dy=0;dy<b.l;dy++){for(const k of[`${b.x-1},${b.y+dy}`,`${b.x+b.w},${b.y+dy}`])if(unlocked.has(k)&&!cm.has(k))f.push(k);}
+    return f;
+  }
+  function fits(b,x,y,cm){for(let dy=0;dy<b.l;dy++)for(let dx=0;dx<b.w;dx++){const k=`${x+dx},${y+dy}`;if(!unlocked.has(k)||cm.has(k))return false;}return true;}
+
+  const result=layout.map(b=>({...b}));
+  for(let pass=0;pass<3;pass++){
+    const cm=rebuildCM(result);
+    let anyFixed=false;
+    for(let i=0;i<result.length;i++){
+      const b=result[i];
+      if(!b.road||b.type==='main_building')continue;
+      if(freePerim(b,cm).length>0)continue;
+      // Collect non-road neighbors
+      const nIdxs=new Set();
+      for(let dx=0;dx<b.w;dx++){for(const k of[`${b.x+dx},${b.y-1}`,`${b.x+dx},${b.y+b.l}`]){const j=cm.get(k);if(j!=null&&!result[j].road&&result[j].type!=='main_building')nIdxs.add(j);}}
+      for(let dy=0;dy<b.l;dy++){for(const k of[`${b.x-1},${b.y+dy}`,`${b.x+b.w},${b.y+dy}`]){const j=cm.get(k);if(j!=null&&!result[j].road&&result[j].type!=='main_building')nIdxs.add(j);}}
+      for(const ni of nIdxs){
+        const nb=result[ni];
+        for(let dy=0;dy<nb.l;dy++)for(let dx=0;dx<nb.w;dx++)cm.delete(`${nb.x+dx},${nb.y+dy}`);
+        let moved=false;
+        outer:for(let y=minY;y<=maxY-nb.l+1;y++)for(let x=minX;x<=maxX-nb.w+1;x++)
+          if(fits(nb,x,y,cm)){result[ni]={...nb,x,y};for(let dy=0;dy<nb.l;dy++)for(let dx=0;dx<nb.w;dx++)cm.set(`${x+dx},${y+dy}`,ni);moved=true;anyFixed=true;break outer;}
+        if(!moved){for(let dy=0;dy<nb.l;dy++)for(let dx=0;dx<nb.w;dx++)cm.set(`${nb.x+dx},${nb.y+dy}`,ni);}
+        if(freePerim(b,cm).length>0)break;
+      }
+    }
+    if(!anyFixed)break;
+  }
+  return result;
+}
+
 function computeMetrics(original, redesigned) {
   return {
     roads: {
@@ -1824,6 +1879,10 @@ function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metri
   phase3State.generatedRoads = generatedRoads || [];
   phase3State.currentTab = 'original';
   phase3State.zoom = 1;
+  // Pre-compute original city stats for metrics comparison
+  phase3State.origRoadTiles = (cityState.roads || []).reduce((s,r)=>s+(r.w||1)*(r.l||1),0);
+  phase3State.origFreeCells = countFreeCells(originalBuildings, []);
+  phase3State.origUnconnected = 0; // original city assumed fully connected
   
   // Hide viewer, show redesign results
   document.getElementById('viewer-screen').style.display = 'none';
@@ -1999,6 +2058,12 @@ function redrawRedesignCanvas() {
     ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+    // Road-required indicator (orange dot, top-right corner)
+    if (b.road) {
+      ctx.fillStyle = '#ff8800';
+      ctx.beginPath(); ctx.arc(x + w - 3, y + 3, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
 
     // Label (same threshold as main canvas)
     if (b.w >= 3 && b.l >= 3) drawLabel(ctx, b.name, x, y, w, h, 8, 'rgba(0,0,0,0.75)');
@@ -2270,62 +2335,120 @@ function updateRedesignMetrics() {
   const metricsContainer = document.getElementById('redesign-metrics-list');
   metricsContainer.innerHTML = '';
   
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'font-size:0.7rem;color:#8a9ab0;margin-bottom:8px;';
+  hdr.textContent = 'Original → Redesign';
+  metricsContainer.appendChild(hdr);
+
   Object.entries(metrics).forEach(([key, metric]) => {
     const row = document.createElement('div');
     row.className = 'metric-row';
-    
-    const before = metric.isPercentage ? `${Math.round(metric.before * 100)}%` : Math.round(metric.before);
-    const after = metric.isPercentage ? `${Math.round(metric.after * 100)}%` : Math.round(metric.after);
-    const delta = metric.after - metric.before;
-    const deltaStr = delta > 0 ? `+${delta.toFixed(1)}` : `${delta.toFixed(1)}`;
-    const color = (metric.goodIfPositive && delta > 0) || (!metric.goodIfPositive && delta < 0) ? '#70a860' : '#d86860';
-    
+
+    const fmt = v => metric.isPercentage ? `${Math.round(v * 100)}%` : Math.round(v);
+    const before = fmt(metric.before);
+    const after  = fmt(metric.after);
+    const delta  = metric.after - metric.before;
+    const sign   = delta > 0 ? '+' : '';
+    const deltaStr = `${sign}${Math.round(delta)}`;
+    const neutral  = Math.abs(delta) < 0.5;
+    const color    = neutral ? '#8a9ab0'
+      : (metric.goodIfPositive && delta > 0) || (!metric.goodIfPositive && delta < 0) ? '#70a860' : '#d86860';
+
     row.innerHTML = `
       <div class="metric-label">${metric.label}</div>
       <div class="metric-values">
         <span>${before} → ${after}</span>
-        <span style="color: ${color}; font-weight: bold;">${deltaStr}</span>
+        <span style="color: ${color}; font-weight: bold;">${neutral ? '=' : deltaStr}</span>
       </div>
     `;
-    
+
     metricsContainer.appendChild(row);
   });
 }
 
 /**
- * Recalculate all metrics for current buildings
+ * Recalculate all metrics — before = original city, after = current redesign state
  */
 function recalculateMetrics(buildings) {
+  const roadSet = new Set((phase3State.generatedRoads || []).map(r => `${r.x},${r.y}`));
   return {
-    roads: {
-      label: 'Road Segments',
-      before: calculateRoadCount(phase3State.redesignedBuildings),
-      after: calculateRoadCount(buildings),
+    roadTiles: {
+      label: 'Road Tiles',
+      before: phase3State.origRoadTiles || 0,
+      after: (phase3State.generatedRoads || []).length,
       goodIfPositive: false,
       isPercentage: false,
     },
-    clustering: {
-      label: 'Clustering Efficiency',
-      before: calculateClusteringScore(phase3State.redesignedBuildings),
-      after: calculateClusteringScore(buildings),
-      goodIfPositive: true,
-      isPercentage: true,
+    unconnected: {
+      label: 'Unconnected Buildings',
+      before: phase3State.origUnconnected || 0,
+      after: countUnconnected(buildings, roadSet),
+      goodIfPositive: false,
+      isPercentage: false,
     },
-    categoryGrouping: {
-      label: 'Category Grouping Score',
-      before: calculateCategoryGrouping(phase3State.redesignedBuildings),
-      after: calculateCategoryGrouping(buildings),
-      goodIfPositive: true,
-      isPercentage: true,
-    },
-    freeSpace: {
-      label: 'Contiguous Free Space',
-      before: calculateFreeSpace(phase3State.redesignedBuildings),
-      after: calculateFreeSpace(buildings),
+    freeCells: {
+      label: 'Free Cells (unlocked)',
+      before: phase3State.origFreeCells || 0,
+      after: countFreeCells(buildings, phase3State.generatedRoads || []),
       goodIfPositive: true,
       isPercentage: false,
     },
+    compactness: {
+      label: 'Avg Dist to Town Hall',
+      before: calcCompactness(phase3State.originalBuildings),
+      after: calcCompactness(buildings),
+      goodIfPositive: false,
+      isPercentage: false,
+    },
   };
+}
+
+function countUnconnected(buildings, roadSet) {
+  // Count road-requiring buildings with no orthogonal neighbor in roadSet
+  const occ = new Set();
+  for (const b of buildings)
+    for (let dy=0;dy<b.l;dy++) for (let dx=0;dx<b.w;dx++) occ.add(`${b.x+dx},${b.y+dy}`);
+  let n = 0;
+  for (const b of buildings) {
+    if (!b.road || b.type==='main_building') continue;
+    let connected = false;
+    outer: for (let dx=0;dx<b.w;dx++) {
+      for (const k of [`${b.x+dx},${b.y-1}`,`${b.x+dx},${b.y+b.l}`])
+        if (roadSet.has(k)) { connected=true; break outer; }
+    }
+    if (!connected) for (let dy=0;dy<b.l;dy++) {
+      for (const k of [`${b.x-1},${b.y+dy}`,`${b.x+b.w},${b.y+dy}`])
+        if (roadSet.has(k)) { connected=true; break; }
+      if (connected) break;
+    }
+    if (!connected) n++;
+  }
+  return n;
+}
+
+function countFreeCells(buildings, roads) {
+  if (!cityState) return 0;
+  const occ = new Set();
+  for (const b of buildings)
+    for (let dy=0;dy<b.l;dy++) for (let dx=0;dx<b.w;dx++) occ.add(`${b.x+dx},${b.y+dy}`);
+  for (const r of roads) occ.add(`${r.x},${r.y}`);
+  let free = 0;
+  for (const a of cityState.unlockedAreas) {
+    const ax=a.x??0, ay=a.y??0;
+    for (let dy=0;dy<(a.length||0);dy++)
+      for (let dx=0;dx<(a.width||0);dx++)
+        if (!occ.has(`${ax+dx},${ay+dy}`)) free++;
+  }
+  return free;
+}
+
+function calcCompactness(buildings) {
+  const th = buildings.find(b=>b.type==='main_building');
+  if (!th) return 0;
+  const cx = th.x+th.w/2, cy = th.y+th.l/2;
+  const onsite = buildings.filter(b=>b.type!=='main_building'&&b.x>-9000);
+  if (!onsite.length) return 0;
+  return Math.round(onsite.reduce((s,b)=>s+Math.abs(b.x+b.w/2-cx)+Math.abs(b.y+b.l/2-cy),0)/onsite.length*10)/10;
 }
 
 /**
