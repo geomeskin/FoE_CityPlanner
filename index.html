@@ -1489,7 +1489,7 @@ function onRedesignButtonClick() {
 
   const originalBuildings = JSON.parse(JSON.stringify(cityState.buildings));
   const fixedSetArr = [...cityState.fixedSet];
-  const RUNS = 6, MAX_ITER = 5000, T0 = 80, T_MIN = 0.5;
+  const RUNS = 6, MAX_ITER = 100000, T0 = 80, T_MIN = 0.5;
 
   let bestLayout = null, bestScore = Infinity, done = 0;
 
