@@ -752,6 +752,7 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
 <div id="redesign-results-screen">
   <div class="redesign-header">
     <button class="back-btn" id="redesign-back-btn">&#8617; Back to City</button>
+    <button class="back-btn" id="redesign-save-btn">&#128190; Save Version</button>
     <h1>Fine-Tune Your Layout</h1>
     <div class="layout-tabs">
       <button class="tab-button active" data-tab="original">Original Layout</button>
@@ -1831,6 +1832,11 @@ function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metri
   document.getElementById('redesign-back-btn').onclick = () => {
     document.getElementById('redesign-results-screen').style.display = 'none';
     document.getElementById('viewer-screen').style.display = 'block';
+  };
+
+  document.getElementById('redesign-save-btn').onclick = () => {
+    const name = prompt('Save this redesign as:', `Redesign ${new Date().toLocaleTimeString()}`);
+    if (name) dbSaveCity(name).then(() => { refreshSavedList(); alert('Saved!'); });
   };
 
   // Setup tabs
