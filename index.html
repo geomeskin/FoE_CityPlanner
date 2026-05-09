@@ -90,7 +90,7 @@ body { background: #1a2230; color: #d0c8b0; font-family: 'Segoe UI', sans-serif;
 }
 .back-btn:hover { background: #243545; }
 
-.subtitle { font-size: 0.78rem; color: #7a8a9a; margin-bottom: 16px; }
+.subtitle { font-size: 0.82rem; color: #9ab0c0; margin-bottom: 16px; }
 
 #tooltip {
   position: fixed; pointer-events: none;
@@ -734,6 +734,15 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
         <p class="fixed-hint">Click any building on the map to lock or unlock it.</p>
         <p class="fixed-summary" id="fixed-summary"></p>
         <div id="fixed-chips"></div>
+        <div style="margin-top:14px;border-top:1px solid #2a4060;padding-top:12px;">
+          <p style="font-size:0.75rem;color:#e8d8a0;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Optimization Settings</p>
+          <div class="slider-row">
+            <span class="slider-label">Same-type grouping</span>
+            <input type="range" id="sl-space" min="0" max="10" value="0" step="1">
+            <span class="slider-val" id="sv-space">0</span>
+          </div>
+          <p style="font-size:0.71rem;color:#506070;margin-top:4px;">0 = group together &nbsp;&middot;&nbsp; 10 = spread out</p>
+        </div>
       </div>
 
     </div>
@@ -751,9 +760,12 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
 <!-- ── Redesign Results Screen (Phase 3) ──────────────────────────────── -->
 <div id="redesign-results-screen">
   <div class="redesign-header">
-    <button class="back-btn" id="redesign-back-btn">&#8617; Back to City</button>
+    <button class="back-btn" id="redesign-back-btn">&#8617; City Overview</button>
     <button class="back-btn" id="redesign-save-btn">&#128190; Save Version</button>
-    <h1>Fine-Tune Your Layout</h1>
+    <div style="flex:1;">
+      <div style="font-size:1.2rem;color:#e8d8a0;letter-spacing:1px;font-weight:600;">City Redesign</div>
+      <div id="redesign-context" style="font-size:0.75rem;color:#8a9ab0;margin-top:2px;">Original Layout &middot; read-only</div>
+    </div>
     <div class="layout-tabs">
       <button class="tab-button active" data-tab="original">Original Layout</button>
       <button class="tab-button" data-tab="redesigned">Redesigned Layout</button>
@@ -770,6 +782,13 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
       </div>
       <div id="redesign-canvas-container">
         <canvas id="redesign-canvas"></canvas>
+      </div>
+      <div class="stats-bar" id="redesign-stats-bar" style="margin-top:8px;flex-shrink:0;">
+        <div class="stat-item"><span class="stat-val" id="rstat-buildings">—</span><span class="stat-lbl">Buildings</span></div>
+        <div class="stat-item"><span class="stat-val" id="rstat-gbs">—</span><span class="stat-lbl">GBs</span></div>
+        <div class="stat-item"><span class="stat-val" id="rstat-road-tiles">—</span><span class="stat-lbl">Road Tiles</span></div>
+        <div class="stat-item"><span class="stat-val" id="rstat-unconnected">—</span><span class="stat-lbl">Unconnected</span></div>
+        <div class="stat-item"><span class="stat-val" id="rstat-free">—</span><span class="stat-lbl">Free Cells</span></div>
       </div>
     </div>
     
@@ -831,6 +850,22 @@ const TYPE_LABELS = {
   friends_tavern:   'Friends Tavern',
   greatbuilding:    'Great Building',
 };
+
+// Building set detection: name substring → dot color (bottom-left corner)
+const SET_COLORS = [
+  { pattern: /serpent.?statue/i,        color: '#40e0b0' },
+  { pattern: /cherry.?garden/i,         color: '#ff69b4' },
+  { pattern: /ritual.?flame/i,          color: '#ff6b35' },
+  { pattern: /shrine.?of.?knowledge/i,  color: '#9b59b6' },
+  { pattern: /wishing.?well/i,          color: '#3498db' },
+  { pattern: /victory.?tower/i,         color: '#f1c40f' },
+  { pattern: /liberation/i,             color: '#e74c3c' },
+  { pattern: /ravens?/i,                color: '#7f8c8d' },
+];
+function getSetColor(name) {
+  for (const s of SET_COLORS) if (s.pattern.test(name)) return s.color;
+  return null;
+}
 
 const PAD    = 4;
 const CELL   = 13;
@@ -1264,6 +1299,11 @@ function drawCanvas() {
       ctx.fillStyle = '#ff8800';
       ctx.beginPath(); ctx.arc(px + pw - 3, py + 3, 2.5, 0, Math.PI * 2); ctx.fill();
     }
+    const setCol = getSetColor(b.name || '');
+    if (setCol) {
+      ctx.fillStyle = setCol;
+      ctx.beginPath(); ctx.arc(px + 3, py + ph - 3, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
     if (b.w >= 3 && b.l >= 3) drawLabel(ctx, b.name, px, py, pw, ph, 8, 'rgba(0,0,0,0.75)');
   }
 
@@ -1298,10 +1338,10 @@ function drawCanvas() {
   document.getElementById('stat-road-free').textContent = roadFree;
   document.getElementById('stat-roads').textContent     = roads.length;
 
-  document.getElementById('city-subtitle').textContent =
-    `Player ${playerId}  |  ${buildings.length} buildings  |  ` +
-    `${unlockedAreas.length} expansion chunks  |  ` +
-    `Click a building to lock/unlock it  |  Hover for details`;
+  document.getElementById('city-subtitle').innerHTML =
+    `<span style="color:#c8d8a8;font-weight:600;">&#128273; Click any building to lock/unlock it for the optimizer</span>` +
+    `<span style="color:#4a6070;"> &nbsp;&mdash;&nbsp; </span>` +
+    `<span style="color:#6a8a9a;">hover for details &nbsp;&middot;&nbsp; Player ${playerId} &nbsp;&middot;&nbsp; ${buildings.length} buildings</span>`;
 
   // ── Tooltip & click lookups ──
   const buildingCell = new Map();
@@ -1504,6 +1544,7 @@ function onRedesignButtonClick() {
   const originalBuildings = JSON.parse(JSON.stringify(cityState.buildings));
   const fixedSetArr = [...cityState.fixedSet];
   const RUNS = 6, RUN_SECONDS = 60, T0 = 80, T_MIN = 0.5;
+  const spaceSlider = parseInt(document.getElementById('sl-space')?.value || '0', 10);
 
   // Reserve original road cells — SA cannot build on these, guaranteeing corridors stay open
   const reservedArr = [];
@@ -1514,7 +1555,7 @@ function onRedesignButtonClick() {
 
   const workerSrc = `
 self.onmessage = function(e) {
-  const { buildings, unlockedAreas, fixedSetArr, reservedArr, runMs, T0, T_MIN } = e.data;
+  const { buildings, unlockedAreas, fixedSetArr, reservedArr, runMs, T0, T_MIN, spaceSlider } = e.data;
   const fixedSet = new Set(fixedSetArr);
   const reserved = new Set(reservedArr);
   function buildingKey(b) { return b.x+','+b.y; }
@@ -1532,7 +1573,8 @@ self.onmessage = function(e) {
   console.log('[SA worker] unlocked:'+unlocked.size+' fixed:'+fixed.length+' movable:'+movable.length+' reserved:'+reserved.size);
   const townHall = fixed.find(b=>b.type==='main_building');
   const thCx = townHall ? townHall.x+townHall.w/2 : 0, thCy = townHall ? townHall.y+townHall.l/2 : 0;
-  function bScore(b) { const d=Math.abs(b.x+b.w/2-thCx)+Math.abs(b.y+b.l/2-thCy); return b.road?d*Math.sqrt(b.w*b.l)*2:d; }
+  const clusterW = Math.max(0, 0.5 - (spaceSlider||0)*0.05);
+  function bScore(bld,cur) { const d=Math.abs(bld.x+bld.w/2-thCx)+Math.abs(bld.y+bld.l/2-thCy); const same=cur.filter(o=>o!==bld&&o.type===bld.type); const clust=same.length===0?0:Math.min(...same.map(o=>Math.abs(bld.x-o.x)+Math.abs(bld.y-o.y))); return (bld.road?d*Math.sqrt(bld.w*bld.l)*2:d)+clust*clusterW; }
   function addOcc(occ,b)    { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.add((b.x+dx)+','+(b.y+dy)); }
   function removeOcc(occ,b) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.delete((b.x+dx)+','+(b.y+dy)); }
   // reserved cells are treated as permanently occupied (road corridors)
@@ -1542,7 +1584,7 @@ self.onmessage = function(e) {
   let current=[...movable].map(b=>({...b})), occ=new Set(), curScore=0, T=T0, iters=0;
   for(const b of fixed)   addOcc(occ,b);
   for(const b of current) addOcc(occ,b);
-  curScore=current.reduce((s,b)=>s+bScore(b),0);
+  curScore=current.reduce((s,b)=>s+bScore(b,current),0);
   while(true){
     if(iters % 2000 === 0 && Date.now() >= endTime) break;
     iters++;
@@ -1552,7 +1594,7 @@ self.onmessage = function(e) {
     removeOcc(occ,a);removeOcc(occ,b);
     if(fits(a,b.x,b.y,occ)&&fits(b,a.x,a.y,occ)){
       const na={...a,x:b.x,y:b.y},nb={...b,x:a.x,y:a.y};
-      const delta=bScore(na)+bScore(nb)-bScore(a)-bScore(b);
+      const delta=bScore(na,current)+bScore(nb,current)-bScore(a,current)-bScore(b,current);
       if(delta<0||Math.random()<Math.exp(-delta/T)){current[i]=na;current[j]=nb;addOcc(occ,na);addOcc(occ,nb);curScore+=delta;}
       else{addOcc(occ,a);addOcc(occ,b);}
     } else{addOcc(occ,a);addOcc(occ,b);}
@@ -1574,7 +1616,7 @@ self.onmessage = function(e) {
       fixedSetArr,
       reservedArr,
       runMs: RUN_SECONDS * 1000,
-      T0, T_MIN,
+      T0, T_MIN, spaceSlider,
     });
     worker.onmessage = e => {
       worker.terminate();
@@ -1896,7 +1938,7 @@ function showRedesignResultsScreen(originalBuildings, redesignedBuildings, metri
   document.getElementById('redesign-save-btn').onclick = () => {
     const base = cityState.filename || `Player ${cityState.playerId}`;
     const name = prompt('Save this redesign as:', `${base} — Redesign ${new Date().toLocaleTimeString()}`);
-    if (name) dbSaveCity(name).then(() => { refreshSavedList(); alert('Saved!'); });
+    if (name) dbSaveCity(name).then(() => { refreshSavedList(); alert(`"${name}" saved!\n\nTo load it: click "City Overview" → "Load New City" — it will appear in the Saved Cities list.`); });
   };
 
   // Setup tabs
@@ -1929,16 +1971,20 @@ function setupTabSwitching() {
       // Redraw canvas
       redrawRedesignCanvas();
       
-      // Update footer
+      // Update footer and context indicator
       const stats = document.getElementById('redesign-stats');
       const resetBtn = document.getElementById('redesign-reset-btn');
+      const ctxEl = document.getElementById('redesign-context');
       if (phase3State.currentTab === 'original') {
         stats.textContent = 'Original Layout • Read-only';
         resetBtn.disabled = true;
+        if (ctxEl) ctxEl.textContent = 'Original Layout · read-only';
       } else {
         stats.textContent = 'Redesigned Layout • Drag buildings to adjust';
         resetBtn.disabled = false;
+        if (ctxEl) ctxEl.textContent = 'Redesigned Layout · drag buildings to fine-tune';
       }
+      updateRedesignStatsBar();
     });
   });
 }
@@ -2063,6 +2109,13 @@ function redrawRedesignCanvas() {
     if (b.road) {
       ctx.fillStyle = '#ff8800';
       ctx.beginPath(); ctx.arc(x + w - 3, y + 3, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Set indicator (colored dot, bottom-left corner)
+    const setCol = getSetColor(b.name || '');
+    if (setCol) {
+      ctx.fillStyle = setCol;
+      ctx.beginPath(); ctx.arc(x + 3, y + h - 3, 2.5, 0, Math.PI * 2); ctx.fill();
     }
 
     // Label (same threshold as main canvas)
@@ -2364,6 +2417,40 @@ function updateRedesignMetrics() {
 
     metricsContainer.appendChild(row);
   });
+
+  updateRedesignStatsBar();
+}
+
+function updateRedesignStatsBar() {
+  if (!cityState) return;
+  const isOrig = phase3State.currentTab === 'original';
+  let buildings = isOrig ? phase3State.originalBuildings : phase3State.redesignedBuildings;
+  if (!isOrig && phase3State.userAdjustments.size > 0)
+    buildings = buildings.map(b => phase3State.userAdjustments.get(`${b.x},${b.y}`) || b);
+
+  const unlockedSet = new Set();
+  for (const a of cityState.unlockedAreas) {
+    const ax = a.x ?? 0, ay = a.y ?? 0;
+    for (let dy = 0; dy < (a.length || 0); dy++)
+      for (let dx = 0; dx < (a.width || 0); dx++)
+        unlockedSet.add(`${ax+dx},${ay+dy}`);
+  }
+  const onsite = buildings.filter(b => {
+    for (let dy = 0; dy < b.l; dy++)
+      for (let dx = 0; dx < b.w; dx++)
+        if (unlockedSet.has(`${b.x+dx},${b.y+dy}`)) return true;
+    return false;
+  });
+
+  const roads = isOrig ? [] : (phase3State.generatedRoads || []);
+  const roadSet = new Set(roads.map(r => `${r.x},${r.y}`));
+  const roadTiles = isOrig ? (phase3State.origRoadTiles || 0) : roads.length;
+
+  document.getElementById('rstat-buildings').textContent = onsite.length;
+  document.getElementById('rstat-gbs').textContent = onsite.filter(b => b.type === 'greatbuilding').length;
+  document.getElementById('rstat-road-tiles').textContent = roadTiles;
+  document.getElementById('rstat-unconnected').textContent = isOrig ? 0 : countUnconnected(onsite, roadSet);
+  document.getElementById('rstat-free').textContent = countFreeCells(onsite, roads);
 }
 
 /**
