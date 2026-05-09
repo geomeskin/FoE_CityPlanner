@@ -751,7 +751,7 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
       <button id="redesign-btn" disabled title="Optimizer coming in the next phase">
         Plan Redesign &rarr;
       </button>
-      <button id="reset-btn">Reset locks to default</button>
+      <button id="reset-btn">Free up locked bldgs</button>
       <span class="next-hint">Optimizer coming in the next phase</span>
     </div>
   </div>
@@ -851,20 +851,22 @@ const TYPE_LABELS = {
   greatbuilding:    'Great Building',
 };
 
-// Building set detection: name substring → dot color (bottom-left corner)
-const SET_COLORS = [
-  { pattern: /serpent.?statue/i,        color: '#40e0b0' },
-  { pattern: /cherry.?garden/i,         color: '#ff69b4' },
-  { pattern: /ritual.?flame/i,          color: '#ff6b35' },
-  { pattern: /shrine.?of.?knowledge/i,  color: '#9b59b6' },
-  { pattern: /wishing.?well/i,          color: '#3498db' },
-  { pattern: /victory.?tower/i,         color: '#f1c40f' },
-  { pattern: /liberation/i,             color: '#e74c3c' },
-  { pattern: /ravens?/i,                color: '#7f8c8d' },
-];
+// Building set/chain detection — exact piece names mapped to a color per set.
+// Pieces are matched case-insensitively. Add new sets here as FoE releases them.
+const BUILDING_SETS = {
+  'Cherry Garden':     { color: '#ff69b4', pieces: ["Emperor's Entrance", 'Sakura Rock', 'Zen Zone', 'Nishikigoi Pond', 'Gong of Wisdom'] },
+  'Celtic Forest':     { color: '#40d070', pieces: ['Druid Willow', 'Faery Rings', 'Majestic Fawn', 'Moon Gate', 'Standing Stone'] },
+  'Winter Village':    { color: '#80c8ff', pieces: ["Candlemaker's Tent", 'Halmbock', "Madame Fortuna's Tent", 'Moose Meadow', 'Smörgåsbord Feast', 'Smorgasbord Feast', 'Straw Star Tent', "Sugar Baker's Booth", "Tinkerer's Tent", "Toymaker's Booth"] },
+  'Piazza':            { color: '#e8a040', pieces: ['Piazza Clock Tower', 'Piazza Fountain', 'Piazza Cafe', 'Piazza Homes', 'Piazza Mask Vendor'] },
+  'Indian Palace':     { color: '#d04080', pieces: ['Western Palace Tower', 'Eastern Palace Tower', "Maharaja's Palace", "Maharaja's Jungle Pond", 'Bandar Playground'] },
+  'Indian Fountain':   { color: '#9040d0', pieces: ['Memorial Chhatri', 'Chhatri Garden', 'Elephant Fountain', 'Elephant Fountain Gate', 'Titan Arum Plant'] },
+  'Feathered Serpent': { color: '#40e0b0', pieces: ['Feathered Serpent Statue', 'Serpent Fins', 'Serpent Spikes', 'Serpent Feathers'] },
+};
+const SET_COLOR_MAP = new Map();
+for (const { color, pieces } of Object.values(BUILDING_SETS))
+  for (const p of pieces) SET_COLOR_MAP.set(p.toLowerCase(), color);
 function getSetColor(name) {
-  for (const s of SET_COLORS) if (s.pattern.test(name)) return s.color;
-  return null;
+  return SET_COLOR_MAP.get((name || '').toLowerCase()) || null;
 }
 
 const PAD    = 4;
