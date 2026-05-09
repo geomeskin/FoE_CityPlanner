@@ -626,6 +626,7 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
 </style>
 </head>
 <body>
+<div id="tooltip"></div>
 
 <!-- ── Import Screen ──────────────────────────────────────────────────── -->
 <div id="import-screen">
@@ -678,7 +679,6 @@ input[type=range] { width: 90px; accent-color: #2e6da4; cursor: pointer; }
     <button class="back-btn" id="back-btn">&#8617; Load New City</button>
   </div>
   <p class="subtitle" id="city-subtitle"></p>
-  <div id="tooltip"></div>
   <div id="container"><canvas id="grid"></canvas></div>
 
   <div class="legend">
@@ -854,7 +854,9 @@ const TYPE_LABELS = {
 };
 
 // Building set/chain detection — exact piece names mapped to a color per set.
-// Pieces are matched case-insensitively. Add new sets here as FoE releases them.
+// Pieces are matched case-insensitively. Leveled building name formats handled:
+//   "Lv. N - Piece Name"  (prefix)  →  normalized to "Piece Name"
+//   "Piece Name - Lv. N"  (suffix)  →  normalized to "Piece Name"
 const BUILDING_SETS = {
   'Cherry Garden':     { color: '#ff69b4', pieces: ["Emperor's Entrance", 'Sakura Rock', 'Zen Zone', 'Nishikigoi Pond', 'Gong of Wisdom'] },
   'Celtic Forest':     { color: '#40d070', pieces: ['Druid Willow', 'Faery Rings', 'Majestic Fawn', 'Moon Gate', 'Standing Stone'] },
@@ -863,12 +865,31 @@ const BUILDING_SETS = {
   'Indian Palace':     { color: '#d04080', pieces: ['Western Palace Tower', 'Eastern Palace Tower', "Maharaja's Palace", "Maharaja's Jungle Pond", 'Bandar Playground'] },
   'Indian Fountain':   { color: '#9040d0', pieces: ['Memorial Chhatri', 'Chhatri Garden', 'Elephant Fountain', 'Elephant Fountain Gate', 'Titan Arum Plant'] },
   'Feathered Serpent': { color: '#40e0b0', pieces: ['Feathered Serpent Statue', 'Serpent Fins', 'Serpent Spikes', 'Serpent Feathers'] },
+  'Roads to Victory':  { color: '#e8b800', pieces: ['Statue of Honor', 'Road to Victory'] },
 };
+function _normBldName(n) {
+  return (n || '').toLowerCase()
+    .replace(/^lv\.\s*\d+\s*-\s*/, '')   // strip "Lv. N - " prefix
+    .replace(/\s*-\s*lv\.\s*\d+$/, '')    // strip " - Lv. N" suffix
+    .replace(/\s*\(.*?\)\s*$/, '')         // strip trailing "(Era Name)"
+    .trim();
+}
 const SET_COLOR_MAP = new Map();
-for (const { color, pieces } of Object.values(BUILDING_SETS))
-  for (const p of pieces) SET_COLOR_MAP.set(p.toLowerCase(), color);
+const SET_ID_MAP    = new Map();
+for (const [setName, { color, pieces }] of Object.entries(BUILDING_SETS)) {
+  for (const p of pieces) {
+    const lc = p.toLowerCase(), norm = _normBldName(p);
+    SET_COLOR_MAP.set(lc, color);   SET_ID_MAP.set(lc, setName);
+    if (norm !== lc) { SET_COLOR_MAP.set(norm, color); SET_ID_MAP.set(norm, setName); }
+  }
+}
 function getSetColor(name) {
-  return SET_COLOR_MAP.get((name || '').toLowerCase()) || null;
+  const lc = (name || '').toLowerCase();
+  return SET_COLOR_MAP.get(lc) || SET_COLOR_MAP.get(_normBldName(name)) || null;
+}
+function getBuildingSetId(name) {
+  const lc = (name || '').toLowerCase();
+  return SET_ID_MAP.get(lc) || SET_ID_MAP.get(_normBldName(name)) || null;
 }
 
 const PAD    = 4;
@@ -1546,6 +1567,7 @@ function onRedesignButtonClick() {
   btn.textContent = 'Optimizing… 0:00';
 
   const originalBuildings = JSON.parse(JSON.stringify(cityState.buildings));
+  for (const b of originalBuildings) b.setId = getBuildingSetId(b.name) || null;
   const fixedSetArr = [...cityState.fixedSet];
   const RUNS = 6, RUN_SECONDS = 60, T0 = 80, T_MIN = 0.5;
   const spaceSlider = parseInt(document.getElementById('sl-space')?.value || '0', 10);
@@ -1578,7 +1600,9 @@ self.onmessage = function(e) {
   const townHall = fixed.find(b=>b.type==='main_building');
   const thCx = townHall ? townHall.x+townHall.w/2 : 0, thCy = townHall ? townHall.y+townHall.l/2 : 0;
   const clusterW = Math.max(0, 0.5 - (spaceSlider||0)*0.05);
-  function bScore(bld,cur) { const d=Math.abs(bld.x+bld.w/2-thCx)+Math.abs(bld.y+bld.l/2-thCy); const same=cur.filter(o=>o!==bld&&o.type===bld.type); const clust=same.length===0?0:Math.min(...same.map(o=>Math.abs(bld.x-o.x)+Math.abs(bld.y-o.y))); return (bld.road?d*Math.sqrt(bld.w*bld.l)*2:d)+clust*clusterW; }
+  const nameW = 0.75;
+  const setW = 1.5;
+  function bScore(bld,cur) { const d=Math.abs(bld.x+bld.w/2-thCx)+Math.abs(bld.y+bld.l/2-thCy); const same=cur.filter(o=>o!==bld&&o.type===bld.type); const clust=same.length===0?0:Math.min(...same.map(o=>Math.abs(bld.x-o.x)+Math.abs(bld.y-o.y))); const sameName=cur.filter(o=>o!==bld&&o.name===bld.name); const nameClust=sameName.length===0?0:Math.min(...sameName.map(o=>Math.abs(bld.x-o.x)+Math.abs(bld.y-o.y))); const sameSet=bld.setId?cur.filter(o=>o!==bld&&o.setId===bld.setId):[]; const setClust=sameSet.length===0?0:Math.min(...sameSet.map(o=>Math.abs(bld.x-o.x)+Math.abs(bld.y-o.y))); return (bld.road?d*Math.sqrt(bld.w*bld.l)*2:d)+clust*clusterW+nameClust*nameW+setClust*setW; }
   function addOcc(occ,b)    { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.add((b.x+dx)+','+(b.y+dy)); }
   function removeOcc(occ,b) { for(let dy=0;dy<b.l;dy++) for(let dx=0;dx<b.w;dx++) occ.delete((b.x+dx)+','+(b.y+dy)); }
   // reserved cells are treated as permanently occupied (road corridors)
@@ -1596,11 +1620,15 @@ self.onmessage = function(e) {
     if(i===j){ T=Math.max(T*0.9999,T_MIN); continue; }
     const a=current[i],b=current[j];
     removeOcc(occ,a);removeOcc(occ,b);
-    if(fits(a,b.x,b.y,occ)&&fits(b,a.x,a.y,occ)){
-      const na={...a,x:b.x,y:b.y},nb={...b,x:a.x,y:a.y};
-      const delta=bScore(na,current)+bScore(nb,current)-bScore(a,current)-bScore(b,current);
-      if(delta<0||Math.random()<Math.exp(-delta/T)){current[i]=na;current[j]=nb;addOcc(occ,na);addOcc(occ,nb);curScore+=delta;}
-      else{addOcc(occ,a);addOcc(occ,b);}
+    if(fits(a,b.x,b.y,occ)){
+      const na={...a,x:b.x,y:b.y};
+      addOcc(occ,na);
+      if(fits(b,a.x,a.y,occ)){
+        const nb={...b,x:a.x,y:a.y};
+        const delta=bScore(na,current)+bScore(nb,current)-bScore(a,current)-bScore(b,current);
+        if(delta<0||Math.random()<Math.exp(-delta/T)){current[i]=na;current[j]=nb;addOcc(occ,nb);curScore+=delta;}
+        else{removeOcc(occ,na);addOcc(occ,a);addOcc(occ,b);}
+      } else{removeOcc(occ,na);addOcc(occ,a);addOcc(occ,b);}
     } else{addOcc(occ,a);addOcc(occ,b);}
     T=Math.max(T*0.9999,T_MIN);
   }
@@ -1637,8 +1665,11 @@ self.onmessage = function(e) {
         btn.disabled = false;
         btn.textContent = 'Plan Redesign →';
         const reserved = new Set(reservedArr);
+        detectOverlaps(bestLayout, 'SA');
         const cleanLayout = resolveOverlaps(bestLayout, cityState.unlockedAreas, reserved);
+        detectOverlaps(cleanLayout, 'resolveOverlaps');
         const accessLayout = ensureRoadAccess(cleanLayout, cityState.unlockedAreas);
+        detectOverlaps(accessLayout, 'ensureRoadAccess');
         const generatedRoads = generateRoads(accessLayout, cityState.unlockedAreas);
         const metrics = computeMetrics(originalBuildings, accessLayout);
         showRedesignResultsScreen(originalBuildings, accessLayout, metrics, generatedRoads);
@@ -1767,6 +1798,20 @@ function generateRoads(buildings, unlockedAreas) {
   });
 }
 
+function detectOverlaps(layout, label) {
+  const occ = new Map();
+  const issues = [];
+  for (const b of layout) {
+    for (let dy=0; dy<b.l; dy++) for (let dx=0; dx<b.w; dx++) {
+      const k = `${b.x+dx},${b.y+dy}`;
+      if (occ.has(k)) issues.push(`${b.name||b.type}@(${b.x},${b.y}) vs ${occ.get(k)} at cell ${k}`);
+      else occ.set(k, `${b.name||b.type}@(${b.x},${b.y})`);
+    }
+  }
+  if (issues.length) console.warn(`[OVERLAP after ${label}] ${issues.length} cells:\n` + issues.slice(0,5).join('\n'));
+  else console.log(`[OVERLAP after ${label}] clean`);
+}
+
 // Post-SA pass: guaranteed overlap-free layout (largest first, find valid slot if needed)
 function resolveOverlaps(layout, unlockedAreas, reserved) {
   const unlocked = new Set();
@@ -1795,12 +1840,14 @@ function resolveOverlaps(layout, unlockedAreas, reserved) {
   const occ = new Set();
   const resolved = [];
   for (const b of sorted) {
+    const isOnsite = [...Array(b.l)].some((_,dy)=>[...Array(b.w)].some((_,dx)=>unlocked.has(`${b.x+dx},${b.y+dy}`)));
+    if (!isOnsite) { resolved.push(b); continue; } // off-site: keep original, never scan unlocked area
     if (fitsAt(b,b.x,b.y,occ)) { mark(b,b.x,b.y,occ); resolved.push(b); continue; }
-    // Overlap detected — find nearest valid position
+    // On-site overlap — find nearest valid position
     let placed=false;
     outer: for(let y=minY;y<=maxY-b.l+1;y++) for(let x=minX;x<=maxX-b.w+1;x++)
       if(fitsAt(b,x,y,occ)){const nb={...b,x,y};mark(nb,x,y,occ);resolved.push(nb);placed=true;break outer;}
-    if(!placed) resolved.push(b); // offsite or no room — keep original, don't mark
+    if(!placed) { resolved.push(b); mark(b,b.x,b.y,occ); } // no room: keep original, mark to block cascade
   }
   return resolved;
 }

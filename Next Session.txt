@@ -1,68 +1,81 @@
-SESSION HANDOFF — 2026-05-07
+SESSION HANDOFF — 2026-05-09 (session 4)
 =============================
 
 WHAT WAS DONE THIS SESSION
 -----------------------------
-1. Deployed to GitHub Pages — live at https://geomeskin.github.io/FoE_CityPlanner/
-2. Fixed null element crash on city import (missing id="fixed-summary")
-3. Replaced mock packer with Simulated Annealing optimizer:
-   - 6 independent runs x 5000 iterations each
-   - Each run starts from a random shuffle of movable buildings
-   - Score = Manhattan distance to town hall (road buildings 2x weight)
-   - Move = swap two random movable buildings if both positions valid
-   - Keeps best result across all 6 runs
-4. Off-site buildings (Friends Tavern, outposts) excluded from packing
-5. Added "Back to City" button on redesign results screen
-6. Roads changed to black (#111111)
-7. Building borders made visible (dark 1px stroke) on both canvases
-8. Stats bar added below legend (Buildings, GBs, Unlocked Cells, Need Road, Road-Free, Road Segments)
-9. Per-cell borders on unlocked area cells for easy space counting
-10. Filename/Player ID displayed in toolbar after city load
-11. Save/Load city versions via IndexedDB (survives page reloads)
-12. Export saved city as JSON file (for cross-device transfer)
-13. Import saved city JSON file back into IndexedDB
-14. Elapsed timer on "Plan Redesign" button (shows 0:00 counting up)
+1. Fixed SA swap overlap bug — the root cause of building overlaps.
+   SA was checking fits(a at b's pos) && fits(b at a's pos) independently,
+   so different-sized buildings could end up at mutually overlapping positions.
+   Fix: temporarily add na to occ after first check, then check nb.
+   Console now shows [OVERLAP after SA] clean / 108 cells before fix.
 
-WHAT STILL NEEDS DOING (in order)
-------------------------------------
-1. ROAD GENERATION — still the biggest gap in the redesign output.
-   The SA optimizer scores by distance to town hall but draws NO roads.
-   Algorithm to build:
-     a) Find town hall (type === 'main_building')
-     b) Start with its perimeter cells as the "road frontier"
-     c) For each road-requiring building (b.road === true), BFS from building
-        outward until hitting the frontier, then add those path cells as roads
-     d) Newly added road cells join the frontier for subsequent buildings
-     e) Return array of {x, y, w:1, l:1} road tiles
-   Wire result into redrawRedesignCanvas (draw roads before buildings, black)
+2. Fixed resolveOverlaps off-site building relocation bug.
+   Off-site buildings failed fitsAt at original position (cells not in unlocked),
+   causing the scan to relocate them INTO the unlocked area as phantom buildings.
+   Fix: added isOnsite check — off-site buildings skip the scan entirely.
 
-2. SA TUNING — need to observe actual run times and result quality.
-   Currently: 6 runs x 5000 iterations. Previous session had ~10 min runs.
-   May need to increase iterations or adjust T0/T_MIN/cooling schedule.
-   Road tile count should replace/augment distance score once road gen is built.
+3. Fixed resolveOverlaps !placed cascade bug.
+   When an on-site building found no valid slot, it was pushed to resolved
+   without marking occ, allowing later buildings to land at the same position.
+   Fix: mark(b, b.x, b.y, occ) even on !placed.
 
-3. SPACE SLIDER — sl-space value is still unused in runSA.
-   Idea: weight compactness score by slider value.
+4. Added detectOverlaps() helper — called after SA / resolveOverlaps / ensureRoadAccess.
+   Logs [OVERLAP after X] clean or lists first 5 offending pairs.
+   Leave in for now; remove before final ship.
 
-4. SET DETECTION — colored dots on buildings belonging to the same named set.
+5. Added "Roads to Victory" set (Statue of Honor + Road to Victory).
+   Statue of Honor comes in Lv. 1-8 ("Name - Lv. N" suffix format).
+
+6. Fixed leveled building name matching — three normalization patterns:
+   - "Lv. N - Name"  (prefix)   → strip to "Name"
+   - "Name - Lv. N"  (suffix)   → strip to "Name"
+   - "Name (Era)"    (trailing)  → strip to "Name"
+   Cherry Garden pieces (Nishikigoi Pond, Sakura Rock) now match their
+   level variants. BUILDING_SETS pieces stay as base names.
+
+7. Added set-based clustering in bScore (setW = 1.5).
+   Buildings in the same BUILDING_SET now attract each other in SA,
+   independent of building type (critical for Roads to Victory where
+   Statue of Honor is "residential" and Road to Victory is "decoration").
+
+CURRENT STATE
+-----------------------------
+- SA is overlap-free (swap bug fixed)
+- resolveOverlaps handles off-site buildings and cascade correctly
+- Set detection handles leveled buildings (all three naming conventions)
+- Set clustering: Roads to Victory, Cherry Garden, and all other BUILDING_SETS
+  pieces pull toward each other during SA optimization
+- detectOverlaps() still in code — should be removed before final ship
+
+WHAT STILL NEEDS DOING
+-----------------------------
+1. Remove detectOverlaps() calls (3 in onRedesignButtonClick + the function itself)
+   once you're confident the overlap bug is fully fixed.
+
+2. Push to GitHub Pages — not yet pushed this session.
+
+3. Set detection: only 8 sets defined. FoE has many more.
+   Add new sets as needed: just one line per set in BUILDING_SETS.
+
+4. Space slider (sl-space) — wired and working (reduces same-type clustering).
+   setW is currently hard-coded at 1.5 (not affected by space slider).
+   Could make set clustering also scale with slider if desired.
 
 KEY FILE / LINE REFERENCES
 -----------------------------
-- index.html ~1476  onRedesignButtonClick() — entry point, has elapsed timer
-- index.html ~1495  runSA()                 — SA optimizer (replace/extend here)
-- index.html ~1580  redrawRedesignCanvas()  — add road drawing here (before buildings)
-- redesign-output.js initializeMetricsPanel() — metrics side panel
-
-DATA SHAPES
-------------
-- cityState.buildings    [{type, name, x, y, w, l, road}]  road=true → needs adjacency
-- cityState.unlockedAreas [{x, y, width, length}]           some omit y → treat as 0
-- cityState.fixedSet     Set of "x,y" strings
-- cityState.roads        [{x, y, w, l}]                     original road tiles
-- Town hall:             b.type === 'main_building'
+- index.html ~858   BUILDING_SETS + _normBldName() + SET_COLOR_MAP/SET_ID_MAP
+- index.html ~893   getSetColor(), getBuildingSetId()
+- index.html ~1570  originalBuildings setId annotation (before postMessage)
+- index.html ~1602  bScore in workerSrc — clusterW, setW, set clustering term
+- index.html ~1610  SA swap fix — addOcc(na) before fits(nb check)
+- index.html ~1784  detectOverlaps() helper function
+- index.html ~1650  detectOverlaps calls (3 — after SA / resolveOverlaps / ensureRoadAccess)
+- index.html ~1797  resolveOverlaps — isOnsite guard + !placed mark fix
 
 GITHUB
 -------
 - Repo:  https://github.com/geomeskin/FoE_CityPlanner
 - Live:  https://geomeskin.github.io/FoE_CityPlanner/
 - Branch: main (GitHub Pages serves from main / root)
+- Last pushed commit: 006a2c0 (session 3 end)
+- Unpushed local commits from session 3 + session 4 work
